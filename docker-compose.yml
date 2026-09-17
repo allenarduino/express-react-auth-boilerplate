@@ -1,21 +1,21 @@
 services:
-  # MySQL Database
+  # PostgreSQL Database
   db:
-    image: mysql:8.0
+    image: postgres:16
     container_name: express-react-auth-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: express_react_auth
-      MYSQL_USER: app_user
-      MYSQL_PASSWORD: app_password
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_password
+      POSTGRES_DB: express_react_auth
     ports:
-      - "3307:3306"
+      - "5433:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
+      test: ["CMD-SHELL", "pg_isready -U app_user -d express_react_auth"]
+      interval: 5s
+      timeout: 5s
       retries: 10
 
   # Backend Service
@@ -35,7 +35,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=4000
-      - DATABASE_URL=mysql://app_user:app_password@db:3306/express_react_auth
+      - DATABASE_URL=postgresql://app_user:app_password@db:5432/express_react_auth
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=7d
       - EMAIL_PROVIDER=resend
@@ -71,5 +71,4 @@ services:
     command: ["npm", "run", "dev", "--", "--host"]
 
 volumes:
-  mysql_data:
-
+  postgres_data:

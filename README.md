@@ -24,7 +24,7 @@ A complete full-stack authentication application with a Node.js + TypeScript bac
 
 ### Backend
 - **RESTful API** - Well-structured API endpoints
-- **Database ORM** - Prisma with MySQL/PostgreSQL support
+- **Database ORM** - Prisma with PostgreSQL
 - **Email Integration** - Nodemailer with multiple providers
 - **Type Safety** - Full TypeScript implementation
 - **Validation** - Zod schema validation
@@ -86,7 +86,7 @@ docker-compose exec backend npx prisma db push
 ### 4. Access the Application
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:4001
-- **Database**: localhost:3306 (MySQL)
+- **Database**: localhost:5433 (PostgreSQL)
 
 ## Frontend
 
@@ -157,7 +157,7 @@ npm run dev
 ```env
 NODE_ENV=development
 PORT=4001
-DATABASE_URL="mysql://root:password@express-react-auth-db:3306/express_react_auth"
+DATABASE_URL="postgresql://app_user:app_password@localhost:5433/express_react_auth"
 JWT_SECRET="your-super-secret-jwt-key"
 JWT_EXPIRES_IN="7d"
 APP_URL="http://localhost:4001"

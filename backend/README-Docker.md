@@ -59,13 +59,12 @@ docker-compose exec app npx prisma db push
 
 ## Services
 
-### Database (MySQL 8.0)
-- **Container**: `auth-api-db`
-- **Port**: `3306`
-- **Database**: `express_auth_boilerplate`
-- **User**: `appuser`
-- **Password**: `apppassword`
-- **Root Password**: `rootpassword`
+### Database (PostgreSQL 16)
+- **Container**: `express-react-auth-db`
+- **Port**: `5433` (host) → `5432` (container)
+- **Database**: `express_react_auth`
+- **User**: `app_user`
+- **Password**: `app_password`
 
 ### Application (Production)
 - **Container**: `auth-api-app`
@@ -85,7 +84,7 @@ The following environment variables are configured in `docker-compose.yml`:
 
 ```yaml
 NODE_ENV: production/development
-DATABASE_URL: "mysql://appuser:apppassword@db:3306/express_auth_boilerplate"
+DATABASE_URL: "postgresql://app_user:app_password@db:5432/express_react_auth"
 JWT_SECRET: "your-production-jwt-secret-change-this"
 JWT_EXPIRES_IN: "1d"
 EMAIL_PROVIDER: "console"
@@ -115,14 +114,14 @@ docker-compose exec app npx prisma migrate reset --force
 make db-shell
 
 # Using Docker Compose
-docker-compose exec db mysql -u appuser -papppassword express_auth_boilerplate
+docker-compose exec db psql -U app_user -d express_react_auth
 
-# Using external MySQL client
+# Using an external PostgreSQL client
 # Host: localhost
-# Port: 3306
-# Database: express_auth_boilerplate
-# Username: appuser
-# Password: apppassword
+# Port: 5433
+# Database: express_react_auth
+# Username: app_user
+# Password: app_password
 ```
 
 ## Development Workflow
@@ -134,7 +133,7 @@ make run-dev
 ```
 
 This will:
-- Start MySQL database
+- Start PostgreSQL database
 - Start the application with hot reload
 - Run database migrations automatically
 - Mount source code for live updates
@@ -220,7 +219,7 @@ make migrate-reset
 ```bash
 # Check what's using the port
 lsof -i :4000
-lsof -i :3306
+lsof -i :5433
 
 # Stop conflicting services or change ports in docker-compose.yml
 ```

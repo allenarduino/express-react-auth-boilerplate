@@ -134,7 +134,7 @@ cp env.example .env
 Required variables:
 ```env
 # Database
-DATABASE_URL=mysql://app_user:app_password@localhost:3307/express_react_auth
+DATABASE_URL=postgresql://app_user:app_password@localhost:5433/express_react_auth
 
 # JWT Configuration
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
