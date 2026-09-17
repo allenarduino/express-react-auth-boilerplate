@@ -5,7 +5,7 @@ import { AuthRepository } from './auth.repository';
 import { UserRepository } from '../user/user.repository';
 import { createEmailProvider } from '../infrastructure/email';
 import { signupSchema, loginSchema, verifyEmailSchema, resendVerificationSchema, verifyTokenSchema, passwordResetRequestSchema, passwordResetSchema, changePasswordSchema } from './auth.validation';
-import { env } from '../config/env';
+import { env, isGoogleAuthConfigured } from '../config/env';
 import { clearAuthCookie, setAuthCookie } from './auth.cookies';
 import { AuthRequest } from '../presentation/middleware/auth';
 
@@ -250,10 +250,29 @@ export class AuthController {
     }
 
     /**
+     * GET /api/auth/google/status
+     * Whether Google sign-in has real OAuth credentials.
+     */
+    googleStatus(_req: Request, res: Response): void {
+        res.status(200).json({
+            success: true,
+            data: { enabled: isGoogleAuthConfigured() },
+        });
+    }
+
+    /**
      * GET /api/auth/google
      * Initiate Google OAuth login
      */
     async googleLogin(req: Request, res: Response): Promise<void> {
+        if (!isGoogleAuthConfigured()) {
+            res.status(503).json({
+                success: false,
+                message: 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend/.env.',
+            });
+            return;
+        }
+
         passport.authenticate('google', {
             scope: ['profile', 'email']
         })(req, res);

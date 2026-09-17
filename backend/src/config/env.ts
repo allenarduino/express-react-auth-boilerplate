@@ -53,9 +53,9 @@ if (missingEnvVars.length > 0) {
 // Export typed environment configuration
 export const env: EnvConfig = {
     // App configuration
-    APP_URL: process.env.APP_URL || 'http://localhost:4000',
+    APP_URL: process.env.APP_URL || 'http://localhost:4001',
     FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
-    PORT: parseInt(process.env.PORT || '4000', 10),
+    PORT: parseInt(process.env.PORT || '4001', 10),
     NODE_ENV: process.env.NODE_ENV || 'development',
 
     // Database
@@ -79,6 +79,20 @@ export const env: EnvConfig = {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
 };
+
+const GOOGLE_PLACEHOLDERS = new Set([
+    'your-google-client-id',
+    'your-google-client-secret',
+])
+
+export function isGoogleAuthConfigured(): boolean {
+    const clientId = env.GOOGLE_CLIENT_ID.trim()
+    const clientSecret = env.GOOGLE_CLIENT_SECRET.trim()
+    if (!clientId || !clientSecret) {
+        return false
+    }
+    return !GOOGLE_PLACEHOLDERS.has(clientId) && !GOOGLE_PLACEHOLDERS.has(clientSecret)
+}
 
 // Export individual constants for convenience
 export const {

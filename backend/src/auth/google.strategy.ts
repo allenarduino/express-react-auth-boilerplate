@@ -2,19 +2,22 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { AuthRepository } from './auth.repository';
 import { UserRepository } from '../user/user.repository';
-import { env } from '../config/env';
+import { env, isGoogleAuthConfigured } from '../config/env';
 
 /**
  * Google OAuth Strategy configuration
  */
 export function configureGoogleStrategy(): void {
+    if (!isGoogleAuthConfigured()) {
+        return
+    }
     const authRepo = new AuthRepository();
     const userRepo = new UserRepository();
 
     passport.use(new GoogleStrategy({
         clientID: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
-        callbackURL: `${env.APP_URL}/api/auth/callback/google`
+        callbackURL: `${env.APP_URL}/api/auth/google/callback`
     }, async (accessToken, refreshToken, profile, done) => {
         try {
             // Check if user already exists with this Google ID

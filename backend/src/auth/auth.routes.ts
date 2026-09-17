@@ -21,6 +21,7 @@ export function createAuthRoutes(authController?: AuthController): Router {
     const getMe = controller.getMe.bind(controller);
     const logout = controller.logout.bind(controller);
     const googleLogin = controller.googleLogin.bind(controller);
+    const googleStatus = controller.googleStatus.bind(controller);
     const googleCallback = controller.googleCallback.bind(controller);
     const changePassword = controller.changePassword.bind(controller);
 
@@ -35,6 +36,7 @@ export function createAuthRoutes(authController?: AuthController): Router {
 
     // Google OAuth routes
     router.get('/google', googleLogin);
+    router.get('/google/status', googleStatus);
     router.get('/google/callback', googleCallback);
     router.get('/callback/google', googleCallback);
 

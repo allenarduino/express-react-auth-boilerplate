@@ -1,6 +1,32 @@
+import { useEffect, useState } from 'react'
+import api from '../lib/api'
 import { getGoogleAuthUrl } from '../lib/brand'
 
 export function AuthGoogleButton() {
+    const [enabled, setEnabled] = useState(false)
+
+    useEffect(() => {
+        let cancelled = false
+        api.get<{ success: boolean; data?: { enabled: boolean } }>('/api/auth/google/status')
+            .then((response) => {
+                if (!cancelled) {
+                    setEnabled(Boolean(response.data?.data?.enabled))
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setEnabled(false)
+                }
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    if (!enabled) {
+        return null
+    }
+
     return (
         <div className="space-y-4">
             <div className="relative">
