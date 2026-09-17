@@ -22,18 +22,18 @@ export function LandingPage() {
 
     return (
         <div className="bg-white">
-            <section className="px-4 pt-16 pb-20 sm:px-6 lg:px-8">
+            <section className="px-4 pt-20 pb-24 sm:px-6 sm:pt-24 sm:pb-28 lg:px-8">
                 <div className="mx-auto max-w-5xl text-center">
                     <p className="text-sm font-medium uppercase tracking-widest text-gray-500">Boilerplate</p>
-                    <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
+                    <h1 className="mt-4 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
                         {APP_FULL_NAME_PREFIX} <span className="whitespace-nowrap">{APP_NAME}</span>
                     </h1>
-                    <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-gray-600">{APP_TAGLINE}</p>
+                    <p className="mx-auto mt-5 max-w-2xl text-xl leading-relaxed text-gray-600">{APP_TAGLINE}</p>
                     <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                         {isAuthenticated ? (
                             <Link
                                 to="/dashboard"
-                                className="rounded-lg bg-gray-900 px-6 py-3 text-sm font-semibold text-white hover:bg-gray-800"
+                                className="rounded-lg bg-gray-900 px-6 py-3 text-base font-semibold text-white hover:bg-gray-800"
                             >
                                 Go to dashboard
                             </Link>
@@ -41,13 +41,13 @@ export function LandingPage() {
                             <>
                                 <Link
                                     to="/signup"
-                                    className="rounded-lg bg-gray-900 px-6 py-3 text-sm font-semibold text-white hover:bg-gray-800"
+                                    className="rounded-lg bg-gray-900 px-6 py-3 text-base font-semibold text-white hover:bg-gray-800"
                                 >
                                     Get started
                                 </Link>
                                 <Link
                                     to="/login"
-                                    className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                                    className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-base font-semibold text-gray-900 hover:bg-gray-50"
                                 >
                                     Sign in
                                 </Link>
