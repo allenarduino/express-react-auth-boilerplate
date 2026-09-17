@@ -19,6 +19,7 @@ export function createAuthRoutes(authController?: AuthController): Router {
     const forgotPassword = controller.forgotPassword.bind(controller);
     const resetPassword = controller.resetPassword.bind(controller);
     const getMe = controller.getMe.bind(controller);
+    const logout = controller.logout.bind(controller);
     const googleLogin = controller.googleLogin.bind(controller);
     const googleCallback = controller.googleCallback.bind(controller);
     const changePassword = controller.changePassword.bind(controller);
@@ -39,6 +40,7 @@ export function createAuthRoutes(authController?: AuthController): Router {
 
     // Protected routes
     router.get('/me', authMiddleware, getMe);
+    router.post('/logout', logout);
     router.post('/change-password', authMiddleware, changePassword);
 
     return router;

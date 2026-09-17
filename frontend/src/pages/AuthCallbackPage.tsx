@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { AuthError, AuthLayout } from '../components/AuthLayout'
 
 export const AuthCallbackPage: React.FC = () => {
-    const [searchParams] = useSearchParams()
     const navigate = useNavigate()
-    const { setTokenFromCallback } = useAuth()
+    const { completeOAuthSession } = useAuth()
     const [error, setError] = useState<string | null>(null)
     const processedRef = useRef(false)
 
@@ -16,12 +15,7 @@ export const AuthCallbackPage: React.FC = () => {
 
         const handleCallback = async () => {
             try {
-                const token = searchParams.get('token')
-                if (!token) {
-                    setError('No authentication token received')
-                    return
-                }
-                await setTokenFromCallback(token)
+                await completeOAuthSession()
                 navigate('/dashboard', { replace: true })
             } catch (err) {
                 console.error('OAuth callback error:', err)
@@ -30,7 +24,7 @@ export const AuthCallbackPage: React.FC = () => {
         }
 
         void handleCallback()
-    }, [searchParams, navigate, setTokenFromCallback])
+    }, [navigate, completeOAuthSession])
 
     if (error) {
         return (

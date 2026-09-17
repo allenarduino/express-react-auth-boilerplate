@@ -1,7 +1,23 @@
-import request from 'supertest';
+import request, { Response } from 'supertest';
 import { app } from '../src/server';
 import { getTestPrisma, resetDatabase } from './database';
 import { testUtils } from './setup';
+
+function cookieList(response: Response): string[] {
+    const header = response.headers['set-cookie'];
+    if (!header) return [];
+    return Array.isArray(header) ? header : [header];
+}
+
+function authCookieHeader(response: Response): string | undefined {
+    return cookieList(response).find((cookie) => cookie.startsWith('auth_token='));
+}
+
+function authCookieValue(response: Response): string | undefined {
+    const header = authCookieHeader(response);
+    if (!header) return undefined;
+    return header.split(';')[0]?.slice('auth_token='.length);
+}
 
 describe('Authentication Integration Tests', () => {
     const prisma = getTestPrisma();
@@ -179,7 +195,7 @@ describe('Authentication Integration Tests', () => {
             verificationToken = created.verificationToken;
         });
 
-        it('should login successfully with verified email', async () => {
+        it('should login successfully and set an httpOnly session cookie', async () => {
             const response = await request(app)
                 .post('/api/auth/login')
                 .send({
@@ -190,8 +206,28 @@ describe('Authentication Integration Tests', () => {
 
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('message');
-            expect(response.body).toHaveProperty('data');
-            expect(response.body.data).toHaveProperty('token');
+            expect(response.body.data?.token).toBeUndefined();
+
+            const cookie = authCookieHeader(response);
+            expect(cookie).toBeTruthy();
+            expect(cookie).toMatch(/HttpOnly/i);
+            expect(cookie).not.toMatch(/Max-Age=/i);
+        });
+
+        it('should set a persistent cookie when rememberMe is true', async () => {
+            const response = await request(app)
+                .post('/api/auth/login')
+                .send({
+                    email: testUser.email,
+                    password: testUser.password,
+                    rememberMe: true,
+                })
+                .expect(200);
+
+            const cookie = authCookieHeader(response);
+            expect(cookie).toBeTruthy();
+            expect(cookie).toMatch(/HttpOnly/i);
+            expect(cookie).toMatch(/Max-Age=2592000/i);
         });
 
         it('should return 401 for unverified email', async () => {
@@ -242,13 +278,15 @@ describe('Authentication Integration Tests', () => {
     });
 
     describe('GET /api/auth/me', () => {
-        let authToken: string;
+        let agent: ReturnType<typeof request.agent>;
+        let bearerToken: string;
 
         beforeEach(async () => {
             const created = await signupAndVerify(testUser.email, testUser.password);
             createdUserId = created.id;
 
-            const loginResponse = await request(app)
+            agent = request.agent(app);
+            const loginResponse = await agent
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
@@ -256,17 +294,24 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
-            authToken = loginResponse.body.data.token;
+            bearerToken = authCookieValue(loginResponse) || '';
         });
 
-        it('should return user profile with a valid token', async () => {
-            const response = await request(app)
-                .get('/api/auth/me')
-                .set('Authorization', `Bearer ${authToken}`)
-                .expect(200);
+        it('should return user profile using the session cookie', async () => {
+            const response = await agent.get('/api/auth/me').expect(200);
 
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('id', createdUserId);
+            expect(response.body.data).toHaveProperty('email', testUser.email);
+        });
+
+        it('should return user profile with a Bearer token', async () => {
+            const response = await request(app)
+                .get('/api/auth/me')
+                .set('Authorization', `Bearer ${bearerToken}`)
+                .expect(200);
+
             expect(response.body.data).toHaveProperty('id', createdUserId);
             expect(response.body.data).toHaveProperty('email', testUser.email);
         });
@@ -301,14 +346,12 @@ describe('Authentication Integration Tests', () => {
         });
     });
 
-    describe('GET /api/user/me', () => {
-        let authToken: string;
+    describe('POST /api/auth/logout', () => {
+        it('should clear the session cookie', async () => {
+            await signupAndVerify(testUser.email, testUser.password);
+            const agent = request.agent(app);
 
-        beforeEach(async () => {
-            const created = await signupAndVerify(testUser.email, testUser.password);
-            createdUserId = created.id;
-
-            const loginResponse = await request(app)
+            await agent
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
@@ -316,14 +359,31 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
-            authToken = loginResponse.body.data.token;
+            await agent.get('/api/auth/me').expect(200);
+            await agent.post('/api/auth/logout').expect(200);
+            await agent.get('/api/auth/me').expect(401);
+        });
+    });
+
+    describe('GET /api/user/me', () => {
+        let agent: ReturnType<typeof request.agent>;
+
+        beforeEach(async () => {
+            const created = await signupAndVerify(testUser.email, testUser.password);
+            createdUserId = created.id;
+
+            agent = request.agent(app);
+            await agent
+                .post('/api/auth/login')
+                .send({
+                    email: testUser.email,
+                    password: testUser.password,
+                })
+                .expect(200);
         });
 
-        it('should return user profile with a valid token', async () => {
-            const response = await request(app)
-                .get('/api/user/me')
-                .set('Authorization', `Bearer ${authToken}`)
-                .expect(200);
+        it('should return user profile with a valid session', async () => {
+            const response = await agent.get('/api/user/me').expect(200);
 
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('data');
@@ -378,7 +438,8 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(401);
 
-            const loginResponse = await request(app)
+            const agent = request.agent(app);
+            await agent
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
@@ -386,10 +447,7 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
-            await request(app)
-                .get('/api/auth/me')
-                .set('Authorization', `Bearer ${loginResponse.body.data.token}`)
-                .expect(200);
+            await agent.get('/api/auth/me').expect(200);
         });
 
         it('should return 400 for an invalid reset token', async () => {
@@ -410,7 +468,8 @@ describe('Authentication Integration Tests', () => {
             const created = await signupAndVerify(testUser.email, testUser.password);
             createdUserId = created.id;
 
-            const loginResponse = await request(app)
+            const agent = request.agent(app);
+            await agent
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
@@ -418,17 +477,13 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
-            const authToken = loginResponse.body.data.token as string;
-
-            await request(app)
+            await agent
                 .delete('/api/user/me')
-                .set('Authorization', `Bearer ${authToken}`)
                 .send({ confirmEmail: 'wrong@example.com' })
                 .expect(400);
 
-            await request(app)
+            await agent
                 .delete('/api/user/me')
-                .set('Authorization', `Bearer ${authToken}`)
                 .send({ confirmEmail: testUser.email })
                 .expect(200);
 
@@ -437,10 +492,7 @@ describe('Authentication Integration Tests', () => {
             });
             expect(userInDb).toBeNull();
 
-            await request(app)
-                .get('/api/auth/me')
-                .set('Authorization', `Bearer ${authToken}`)
-                .expect(404);
+            await agent.get('/api/auth/me').expect(401);
 
             await request(app)
                 .post('/api/auth/login')

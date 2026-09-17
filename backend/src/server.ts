@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import passport from 'passport';
 import { config } from 'dotenv';
@@ -39,6 +40,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.use(cookieParser());
 
 // Initialize repositories with Prisma instance
 const authRepository = new AuthRepository(prisma);
@@ -156,6 +159,7 @@ if (env.NODE_ENV !== 'test') {
         console.log('  POST /api/auth/signup - Register user');
         console.log('  GET  /api/auth/verify?token=xxx - Verify email');
         console.log('  POST /api/auth/login - Login user');
+        console.log('  POST /api/auth/logout - Clear session cookie');
         console.log('  GET  /api/auth/google - Google OAuth login');
         console.log('  GET  /api/auth/google/callback - Google OAuth callback');
         console.log('  GET  /api/auth/me - Get current user (protected)');

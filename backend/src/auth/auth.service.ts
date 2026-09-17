@@ -101,9 +101,29 @@ export class AuthService {
     }
 
     /**
-     * Authenticate user and return JWT token
+     * Sign a JWT. Remember-me sessions last 30 days; otherwise JWT_EXPIRES_IN.
      */
-    async login(email: string, password: string): Promise<{ token: string }> {
+    issueAccessToken(userId: string, email: string, rememberMe = false): string {
+        return jwt.sign(
+            {
+                sub: userId,
+                email,
+            },
+            env.JWT_SECRET,
+            {
+                expiresIn: rememberMe ? '30d' : env.JWT_EXPIRES_IN,
+            } as jwt.SignOptions
+        );
+    }
+
+    /**
+     * Authenticate user and return a JWT for the httpOnly session cookie.
+     */
+    async login(
+        email: string,
+        password: string,
+        rememberMe = false
+    ): Promise<{ token: string; rememberMe: boolean }> {
         const user = await this.authRepo.findByEmail(email);
         if (!user) {
             throw new Error('Invalid email or password');
@@ -121,18 +141,10 @@ export class AuthService {
             throw new Error('Please verify your email address before logging in');
         }
 
-        const token = jwt.sign(
-            {
-                sub: user.id,
-                email: user.email,
-            },
-            env.JWT_SECRET,
-            {
-                expiresIn: env.JWT_EXPIRES_IN,
-            } as jwt.SignOptions
-        );
-
-        return { token };
+        return {
+            token: this.issueAccessToken(user.id, user.email, rememberMe),
+            rememberMe,
+        };
     }
 
     /**

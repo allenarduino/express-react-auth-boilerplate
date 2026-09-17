@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { getApiErrorMessage } from '../lib/api'
-import { getToken, setToken, clearToken } from '../lib/auth'
+import { logoutSession } from '../lib/auth'
 
 export interface User {
     id: string
@@ -22,6 +22,7 @@ export interface User {
 export interface LoginCredentials {
     email: string
     password: string
+    rememberMe?: boolean
 }
 
 export interface SignupCredentials {
@@ -32,13 +33,12 @@ export interface SignupCredentials {
 
 export interface AuthContextType {
     user: User | null
-    token: string | null
     isLoading: boolean
     isAuthenticated: boolean
     login: (credentials: LoginCredentials) => Promise<void>
     signup: (credentials: SignupCredentials) => Promise<{ message: string }>
     logout: (options?: { to?: string; state?: unknown }) => void
-    setTokenFromCallback: (token: string) => Promise<void>
+    completeOAuthSession: () => Promise<void>
     refreshUser: () => Promise<void>
 }
 
@@ -46,24 +46,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null)
-    const [token, setTokenState] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const navigate = useNavigate()
 
-    const isAuthenticated = !!user && !!token
+    const isAuthenticated = !!user
+
+    const fetchUserProfile = async () => {
+        const userResponse = await api.get('/api/auth/me')
+        const profileResponse = await api.get('/api/user/me')
+        const profileData = profileResponse.data.data
+        setUser({
+            ...userResponse.data.data,
+            profile: profileData.profile,
+        })
+    }
 
     useEffect(() => {
         const initializeAuth = async () => {
             try {
-                const storedToken = getToken()
-                if (storedToken) {
-                    setTokenState(storedToken)
-                    await fetchUserProfile(storedToken)
-                }
-            } catch (error) {
-                console.error('Failed to initialize auth:', error)
-                clearToken()
-                setTokenState(null)
+                await fetchUserProfile()
+            } catch {
                 setUser(null)
             } finally {
                 setIsLoading(false)
@@ -73,39 +75,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         void initializeAuth()
     }, [])
 
-    const fetchUserProfile = async (authToken: string) => {
-        const userResponse = await api.get('/api/auth/me', {
-            headers: {
-                Authorization: `Bearer ${authToken}`,
-            },
-        })
-
-        const profileResponse = await api.get('/api/user/me', {
-            headers: {
-                Authorization: `Bearer ${authToken}`,
-            },
-        })
-
-        const profileData = profileResponse.data.data
-        setUser({
-            ...userResponse.data.data,
-            profile: profileData.profile,
-        })
-    }
-
     const login = async (credentials: LoginCredentials) => {
         try {
             setIsLoading(true)
-            const response = await api.post('/api/auth/login', credentials)
-            const authToken = response.data?.data?.token || response.data?.token
-
-            if (!authToken) {
-                throw new Error('No token received from server')
-            }
-
-            setToken(authToken)
-            setTokenState(authToken)
-            await fetchUserProfile(authToken)
+            await api.post('/api/auth/login', {
+                email: credentials.email,
+                password: credentials.password,
+                rememberMe: Boolean(credentials.rememberMe),
+            })
+            await fetchUserProfile()
         } catch (error) {
             throw new Error(getApiErrorMessage(error))
         } finally {
@@ -123,22 +101,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const logout = (options?: { to?: string; state?: unknown }) => {
-        clearToken()
-        setTokenState(null)
+        void logoutSession()
         setUser(null)
         navigate(options?.to ?? '/login', { replace: true, state: options?.state })
     }
 
-    const setTokenFromCallback = async (authToken: string) => {
+    const completeOAuthSession = async () => {
         try {
             setIsLoading(true)
-            setToken(authToken)
-            setTokenState(authToken)
-            await fetchUserProfile(authToken)
+            await fetchUserProfile()
         } catch (error) {
-            console.error('Failed to process OAuth callback:', error)
-            clearToken()
-            setTokenState(null)
             setUser(null)
             throw error
         } finally {
@@ -147,19 +119,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const refreshUser = async () => {
-        if (!token) return
-        await fetchUserProfile(token)
+        await fetchUserProfile()
     }
 
     const value: AuthContextType = {
         user,
-        token,
         isLoading,
         isAuthenticated,
         login,
         signup,
         logout,
-        setTokenFromCallback,
+        completeOAuthSession,
         refreshUser,
     }
 

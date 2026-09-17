@@ -1,5 +1,4 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
-import { getToken } from './auth'
+import axios, { AxiosInstance, AxiosResponse } from 'axios'
 
 /**
  * API client configuration
@@ -7,31 +6,17 @@ import { getToken } from './auth'
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:4000'
 
 /**
- * Create Axios instance with base configuration
+ * Create Axios instance with base configuration.
+ * withCredentials sends the httpOnly auth cookie on every request.
  */
 const api: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout: 20000,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
 })
-
-/**
- * Request interceptor to attach authentication token
- */
-api.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
-        const token = getToken()
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`
-        }
-        return config
-    },
-    (error) => {
-        return Promise.reject(error)
-    }
-)
 
 /**
  * Response interceptor for error handling

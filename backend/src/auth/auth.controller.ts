@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import passport from 'passport';
-import jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
 import { UserRepository } from '../user/user.repository';
 import { createEmailProvider } from '../infrastructure/email';
 import { signupSchema, loginSchema, verifyEmailSchema, resendVerificationSchema, verifyTokenSchema, passwordResetRequestSchema, passwordResetSchema, changePasswordSchema } from './auth.validation';
 import { env } from '../config/env';
+import { clearAuthCookie, setAuthCookie } from './auth.cookies';
 import { AuthRequest } from '../presentation/middleware/auth';
 
 /**
@@ -105,7 +105,7 @@ export class AuthController {
 
     /**
      * POST /api/auth/login
-     * Authenticate user and return JWT token
+     * Authenticate user and set an httpOnly session cookie.
      */
     async login(req: Request, res: Response): Promise<void> {
         try {
@@ -122,15 +122,13 @@ export class AuthController {
                 return;
             }
 
-            const { email, password } = validationResult.data;
-            const result = await this.authService.login(email, password);
+            const { email, password, rememberMe } = validationResult.data;
+            const result = await this.authService.login(email, password, rememberMe);
+            setAuthCookie(res, result.token, result.rememberMe);
 
             res.status(200).json({
                 success: true,
                 message: 'Login successful',
-                data: {
-                    token: result.token,
-                },
             });
         } catch (error) {
             res.status(401).json({
@@ -138,6 +136,18 @@ export class AuthController {
                 message: (error as Error).message,
             });
         }
+    }
+
+    /**
+     * POST /api/auth/logout
+     * Clear the httpOnly session cookie.
+     */
+    async logout(_req: Request, res: Response): Promise<void> {
+        clearAuthCookie(res);
+        res.status(200).json({
+            success: true,
+            message: 'Logged out',
+        });
     }
 
     /**
@@ -271,18 +281,9 @@ export class AuthController {
             }
 
             try {
-                const token = jwt.sign(
-                    {
-                        sub: user.id,
-                        email: user.email,
-                    },
-                    env.JWT_SECRET,
-                    {
-                        expiresIn: env.JWT_EXPIRES_IN,
-                    } as jwt.SignOptions
-                );
-
-                return res.redirect(`${env.FRONTEND_URL}/auth/callback?token=${token}`);
+                const token = this.authService.issueAccessToken(user.id, user.email, true);
+                setAuthCookie(res, token, true);
+                return res.redirect(`${env.FRONTEND_URL}/auth/callback`);
             } catch (error) {
                 return res.status(500).json({
                     success: false,

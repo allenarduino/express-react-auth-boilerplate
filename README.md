@@ -5,9 +5,10 @@ A complete full-stack authentication application with a Node.js + TypeScript bac
 ## Features
 
 ### Authentication & Security
-- **JWT Authentication** - Token-based auth stored in `localStorage` for the SPA (cookie sessions can come later)
+- **httpOnly cookie sessions** - JWT is set as an `auth_token` cookie. It is not stored in `localStorage`.
+- **Remember me** - Unchecked: session cookie. Checked: 30-day cookie and JWT.
 - **Rate limiting** - Login, signup, forgot-password, and resend-verification are limited to 10 requests per 15 minutes per IP
-- **Google OAuth** - Social login with Google
+- **Google OAuth** - Social login with Google (cookie is set on callback; the token is not put in the URL)
 - **Password Reset** - Secure email-based password reset flow
 - **Email Verification** - Account verification via email
 - **Password Hashing** - bcryptjs for secure password storage
@@ -118,12 +119,13 @@ The backend is a Node.js + TypeScript API server with Express, Prisma, and compr
 
 #### Authentication
 - `POST /api/auth/signup` - User registration
-- `POST /api/auth/login` - User login
+- `POST /api/auth/login` - User login (sets httpOnly cookie; body may include `rememberMe`)
+- `POST /api/auth/logout` - Clear session cookie
 - `POST /api/auth/forgot-password` - Request password reset
 - `POST /api/auth/reset-password` - Reset password with token
 - `GET /api/auth/verify` - Verify email address
 - `POST /api/auth/resend-verification` - Resend verification email
-- `GET /api/auth/me` - Get current user info
+- `GET /api/auth/me` - Get current user info (cookie or Bearer)
 - `POST /api/auth/change-password` - Change password (protected)
 - `GET /api/auth/google` - Google OAuth login
 - `GET /api/auth/google/callback` - Google OAuth callback
@@ -227,9 +229,15 @@ cd frontend && npm run build
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
+## Session model
+
+The browser session is an httpOnly cookie named `auth_token`. Axios sends it with `withCredentials: true`. JWT-in-localStorage is a known shortcut this starter does not use.
+
+Remember me controls cookie lifetime: session cookie when unchecked, 30 days when checked. Google OAuth always uses the 30-day cookie.
+
 ## Testing
 
-Backend integration tests cover signup, email verify, login, `/me`, password reset, and delete account.
+Backend integration tests cover signup, email verify, login (cookie + Remember me), `/me`, logout, password reset, and delete account.
 
 ```bash
 # Backend tests
