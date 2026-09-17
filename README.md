@@ -2,6 +2,28 @@
 
 A complete full-stack authentication application with a Node.js + TypeScript backend and React + TypeScript frontend. Features modern dashboard UI, Google OAuth, password reset, and comprehensive user management.
 
+## Screenshots
+
+**Landing**
+
+![Node Express and React Auth Starter](docs/screenshots/landing.png)
+
+**Sign up**
+
+![Create your account](docs/screenshots/signup.png)
+
+**Dashboard**
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+**Profile**
+
+![Profile](docs/screenshots/profile.png)
+
+**Settings**
+
+![Settings](docs/screenshots/settings.png)
+
 ## Features
 
 ### Authentication & Security
