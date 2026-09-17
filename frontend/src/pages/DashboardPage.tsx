@@ -18,7 +18,7 @@ export function DashboardPage() {
                         className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
                     >
                         <h2 className="text-lg font-medium text-gray-900">Profile</h2>
-                        <p className="mt-2 text-sm text-gray-600">Update your photo, name, and public details.</p>
+                        <p className="mt-2 text-sm text-gray-600">Update your photo and name.</p>
                     </Link>
                     <Link
                         to="/dashboard/settings"

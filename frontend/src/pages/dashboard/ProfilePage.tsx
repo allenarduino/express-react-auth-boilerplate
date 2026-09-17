@@ -18,8 +18,6 @@ const PROFILE_PAGE_MAX_WIDTH = 'mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5
 function profileToForm(profile: UserProfileData) {
     return {
         name: profile.profile.name ?? '',
-        bio: profile.profile.bio ?? '',
-        website: profile.profile.website ?? '',
         avatarUrl: profile.profile.avatarUrl ?? '',
     }
 }
@@ -39,7 +37,7 @@ export const ProfilePage: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const [profile, setProfile] = useState<UserProfileData | null>(null)
-    const [form, setForm] = useState({ name: '', bio: '', website: '', avatarUrl: '' })
+    const [form, setForm] = useState({ name: '', avatarUrl: '' })
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
@@ -108,13 +106,6 @@ export const ProfilePage: React.FC = () => {
         setForm((prev) => ({ ...prev, avatarUrl: '' }))
     }
 
-    const normalizeWebsite = (value: string) => {
-        const trimmed = value.trim()
-        if (!trimmed) return null
-        if (/^https?:\/\//i.test(trimmed)) return trimmed
-        return `https://${trimmed}`
-    }
-
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault()
         if (!profile) return
@@ -129,8 +120,6 @@ export const ProfilePage: React.FC = () => {
             setIsSaving(true)
             const updated = await updateUserProfile({
                 name: trimmedName,
-                bio: form.bio.trim() || null,
-                website: normalizeWebsite(form.website),
                 avatarUrl: form.avatarUrl.trim() || null,
             })
             setProfile(updated)
@@ -175,7 +164,7 @@ export const ProfilePage: React.FC = () => {
                     <div className="border-b border-gray-200 px-6 py-5 lg:px-8">
                         <h1 className="text-2xl font-semibold text-gray-900">Profile</h1>
                         <p className="mt-1 text-sm text-gray-600">
-                            Update your photo, name, and public details.
+                            Update your photo and name.
                         </p>
                     </div>
 
@@ -267,36 +256,6 @@ export const ProfilePage: React.FC = () => {
                                     )}
                                 </div>
                                 <p className="mt-1 text-xs text-gray-500">Email cannot be changed here.</p>
-                            </div>
-
-                            <div>
-                                <label htmlFor="profile-website" className="block text-sm font-medium text-gray-700">
-                                    Website
-                                </label>
-                                <input
-                                    id="profile-website"
-                                    type="text"
-                                    value={form.website}
-                                    onChange={(e) => setForm((prev) => ({ ...prev, website: e.target.value }))}
-                                    maxLength={200}
-                                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-                                    placeholder="https://your-site.com"
-                                />
-                            </div>
-
-                            <div className="lg:col-span-2">
-                                <label htmlFor="profile-bio" className="block text-sm font-medium text-gray-700">
-                                    Bio
-                                </label>
-                                <textarea
-                                    id="profile-bio"
-                                    value={form.bio}
-                                    onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value }))}
-                                    maxLength={500}
-                                    rows={4}
-                                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-                                    placeholder="A short introduction"
-                                />
                             </div>
                         </div>
 

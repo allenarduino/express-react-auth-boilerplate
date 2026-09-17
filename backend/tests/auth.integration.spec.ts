@@ -391,9 +391,7 @@ describe('Authentication Integration Tests', () => {
             expect(response.body.data).toHaveProperty('email', testUser.email);
             expect(response.body.data).toHaveProperty('profile');
             expect(response.body.data.profile).toHaveProperty('name');
-            expect(response.body.data.profile).toHaveProperty('bio');
             expect(response.body.data.profile).toHaveProperty('avatarUrl');
-            expect(response.body.data.profile).toHaveProperty('website');
         });
 
         it('should return 401 for missing token', async () => {

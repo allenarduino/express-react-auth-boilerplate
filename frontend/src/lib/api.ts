@@ -49,7 +49,6 @@ api.interceptors.response.use(
  * // PUT request
  * const updateResponse = await api.put('/api/user/profile', {
  *   name: 'John Doe',
- *   bio: 'Software Developer'
  * })
  * 
  * // DELETE request
@@ -95,17 +94,13 @@ export type UserProfileData = {
     googleName?: string | null
     profile: {
         name: string | null
-        bio: string | null
         avatarUrl: string | null
-        website: string | null
     }
 }
 
 export type ProfileUpdatePayload = {
     name?: string | null
-    bio?: string | null
     avatarUrl?: string | null
-    website?: string | null
 }
 
 export async function fetchUserProfile(): Promise<UserProfileData> {

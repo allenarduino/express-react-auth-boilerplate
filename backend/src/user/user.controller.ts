@@ -86,9 +86,7 @@ export class UserController {
             const updateData = validationResult.data;
             const transformedData = {
                 ...(updateData.name !== undefined ? { name: updateData.name } : {}),
-                ...(updateData.bio !== undefined ? { bio: updateData.bio } : {}),
                 ...(updateData.avatarUrl !== undefined ? { avatarUrl: updateData.avatarUrl } : {}),
-                ...(updateData.website !== undefined ? { website: updateData.website } : {}),
             };
 
             const updatedProfile = await this.userService.updateProfile(userId, transformedData);

@@ -13,9 +13,7 @@ export interface User {
     hasPassword?: boolean
     profile?: {
         name?: string
-        bio?: string
         avatarUrl?: string
-        website?: string
     }
 }
 

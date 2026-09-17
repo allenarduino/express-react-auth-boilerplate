@@ -11,9 +11,7 @@ export interface UserProfileData {
     googleName: string | null;
     profile: {
         name: string | null;
-        bio: string | null;
         avatarUrl: string | null;
-        website: string | null;
     };
 }
 
@@ -22,9 +20,7 @@ export interface UserProfileData {
  */
 export interface ProfileUpdateData {
     name?: string | null;
-    bio?: string | null;
     avatarUrl?: string | null;
-    website?: string | null;
 }
 
 /**
@@ -67,9 +63,7 @@ export class UserService {
             googleName: userWithProfile.googleName,
             profile: {
                 name: userWithProfile.profile.name,
-                bio: userWithProfile.profile.bio,
                 avatarUrl: userWithProfile.profile.avatarUrl,
-                website: userWithProfile.profile.website,
             },
         };
     }
@@ -96,29 +90,13 @@ export class UserService {
             throw new Error('Name must be a string or null');
         }
 
-        if (data.bio !== undefined && data.bio !== null && typeof data.bio !== 'string') {
-            throw new Error('Bio must be a string or null');
-        }
-
         if (data.avatarUrl !== undefined && data.avatarUrl !== null && typeof data.avatarUrl !== 'string') {
             throw new Error('Avatar URL must be a string or null');
-        }
-
-        if (data.website !== undefined && data.website !== null && typeof data.website !== 'string') {
-            throw new Error('Website must be a string or null');
         }
 
         // Validate string lengths
         if (data.name && data.name.length > 100) {
             throw new Error('Name must be 100 characters or less');
-        }
-
-        if (data.bio && data.bio.length > 500) {
-            throw new Error('Bio must be 500 characters or less');
-        }
-
-        if (data.website && data.website.length > 200) {
-            throw new Error('Website URL must be 200 characters or less');
         }
 
         // Check if user exists
@@ -145,9 +123,7 @@ export class UserService {
             googleName: user.googleName,
             profile: {
                 name: updatedProfile.name,
-                bio: updatedProfile.bio,
                 avatarUrl: updatedProfile.avatarUrl,
-                website: updatedProfile.website,
             },
         };
     }

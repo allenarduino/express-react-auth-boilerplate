@@ -61,9 +61,7 @@ export class UserRepository {
             data: {
                 userId,
                 name: null,
-                bio: null,
                 avatarUrl: null,
-                website: null,
             },
         });
     }
@@ -79,9 +77,7 @@ export class UserRepository {
             data: {
                 userId,
                 name: profileData.name || null,
-                bio: null,
                 avatarUrl: profileData.avatarUrl || null,
-                website: null,
             },
         });
     }
@@ -157,9 +153,7 @@ export class UserRepository {
             where: { userId },
             data: {
                 name: null,
-                bio: null,
                 avatarUrl: null,
-                website: null,
             },
         });
     }
@@ -179,7 +173,7 @@ export class UserRepository {
     }
 
     /**
-     * Search profiles by name or bio
+     * Search profiles by name
      * @param searchTerm - The term to search for
      * @param skip - Number of records to skip
      * @param take - Number of records to take
@@ -188,10 +182,7 @@ export class UserRepository {
     async searchProfiles(searchTerm: string, skip: number = 0, take: number = 10): Promise<Profile[]> {
         return this.prisma.profile.findMany({
             where: {
-                OR: [
-                    { name: { contains: searchTerm } },
-                    { bio: { contains: searchTerm } },
-                ],
+                name: { contains: searchTerm },
             },
             skip,
             take,
