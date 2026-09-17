@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { APP_FULL_NAME, APP_TAGLINE } from '../lib/brand'
+import { APP_FULL_NAME_PREFIX, APP_NAME, APP_TAGLINE } from '../lib/brand'
 import { useAuth } from '../hooks/useAuth'
 
 const features = [
@@ -23,10 +23,10 @@ export function LandingPage() {
     return (
         <div className="bg-white">
             <section className="px-4 pt-16 pb-20 sm:px-6 lg:px-8">
-                <div className="mx-auto max-w-3xl text-center">
+                <div className="mx-auto max-w-5xl text-center">
                     <p className="text-sm font-medium uppercase tracking-widest text-gray-500">Boilerplate</p>
-                    <h1 className="mt-4 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-                        {APP_FULL_NAME}
+                    <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
+                        {APP_FULL_NAME_PREFIX} <span className="whitespace-nowrap">{APP_NAME}</span>
                     </h1>
                     <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-gray-600">{APP_TAGLINE}</p>
                     <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
