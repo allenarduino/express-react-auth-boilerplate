@@ -5,7 +5,8 @@ A complete full-stack authentication application with a Node.js + TypeScript bac
 ## Features
 
 ### Authentication & Security
-- **JWT Authentication** - Secure token-based authentication
+- **JWT Authentication** - Token-based auth stored in `localStorage` for the SPA (cookie sessions can come later)
+- **Rate limiting** - Login, signup, forgot-password, and resend-verification are limited to 10 requests per 15 minutes per IP
 - **Google OAuth** - Social login with Google
 - **Password Reset** - Secure email-based password reset flow
 - **Email Verification** - Account verification via email
@@ -228,12 +229,11 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## Testing
 
+Backend integration tests cover signup, email verify, login, `/me`, password reset, and delete account.
+
 ```bash
 # Backend tests
 cd backend && npm test
-
-# Frontend tests
-cd frontend && npm test
 ```
 
 ## Contributing

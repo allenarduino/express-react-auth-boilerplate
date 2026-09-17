@@ -4,7 +4,8 @@ This directory contains JWT authentication middleware for protecting routes.
 
 ## Files
 
-- `auth.ts` - Main JWT authentication middleware
+- `auth.ts` - Bearer JWT authentication middleware
+- `rateLimit.ts` - Rate limiter for login, signup, and password-reset writes
 - `index.ts` - Exports all middleware functions
 
 ## Usage

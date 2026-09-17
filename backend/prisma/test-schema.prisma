@@ -1,23 +1,30 @@
-// Test database schema using SQLite for faster testing
+// SQLite copy of the app schema for integration tests
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./test.db"
+  url      = env("TEST_DATABASE_URL")
 }
 
 model User {
-  id                       String   @id @default(uuid())
-  email                    String   @unique
-  passwordHash             String
-  isEmailVerified          Boolean  @default(false)
+  id                       String    @id @default(uuid())
+  email                    String    @unique
+  passwordHash             String?
+  isEmailVerified          Boolean   @default(false)
   verificationToken        String?
   verificationTokenExpires DateTime?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  profile Profile?
+  passwordResetToken       String?
+  passwordResetExpires     DateTime?
+  googleId                 String?   @unique
+  googleEmail              String?
+  googleName               String?
+  googlePicture            String?
+  authProvider             String    @default("email")
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  profile                  Profile?
 }
 
 model Profile {
@@ -29,5 +36,5 @@ model Profile {
   website   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

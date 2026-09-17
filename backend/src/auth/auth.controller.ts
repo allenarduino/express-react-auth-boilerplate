@@ -7,6 +7,7 @@ import { UserRepository } from '../user/user.repository';
 import { createEmailProvider } from '../infrastructure/email';
 import { signupSchema, loginSchema, verifyEmailSchema, resendVerificationSchema, verifyTokenSchema, passwordResetRequestSchema, passwordResetSchema, changePasswordSchema } from './auth.validation';
 import { env } from '../config/env';
+import { AuthRequest } from '../presentation/middleware/auth';
 
 /**
  * Authentication controller for handling HTTP requests
@@ -108,7 +109,6 @@ export class AuthController {
      */
     async login(req: Request, res: Response): Promise<void> {
         try {
-            // Validate input with Zod
             const validationResult = loginSchema.safeParse(req.body);
             if (!validationResult.success) {
                 res.status(400).json({
@@ -207,21 +207,8 @@ export class AuthController {
      */
     async getMe(req: Request, res: Response): Promise<void> {
         try {
-            const authHeader = req.headers.authorization;
-
-            if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                res.status(401).json({
-                    success: false,
-                    message: 'Authorization header with Bearer token is required',
-                });
-                return;
-            }
-
-            const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-            const userInfo = await this.authService.verifyToken(token);
-
-            // Fetch full user data from database including Google OAuth fields
-            const fullUser = await this.authRepo.findById(userInfo.id);
+            const { id } = (req as AuthRequest).user;
+            const fullUser = await this.authRepo.findById(id);
 
             if (!fullUser) {
                 res.status(404).json({
@@ -231,7 +218,6 @@ export class AuthController {
                 return;
             }
 
-            // Return full user data
             res.status(200).json({
                 success: true,
                 message: 'User info retrieved successfully',
@@ -285,19 +271,18 @@ export class AuthController {
             }
 
             try {
-                // Generate JWT token for the user
-                const payload = {
-                    sub: user.id,
-                    email: user.email,
-                };
+                const token = jwt.sign(
+                    {
+                        sub: user.id,
+                        email: user.email,
+                    },
+                    env.JWT_SECRET,
+                    {
+                        expiresIn: env.JWT_EXPIRES_IN,
+                    } as jwt.SignOptions
+                );
 
-                const token = jwt.sign(payload, env.JWT_SECRET, {
-                    expiresIn: env.JWT_EXPIRES_IN,
-                } as jwt.SignOptions);
-
-                // Redirect to frontend with token
-                const frontendUrl = `${env.FRONTEND_URL}/auth/callback?token=${token}`;
-                return res.redirect(frontendUrl);
+                return res.redirect(`${env.FRONTEND_URL}/auth/callback?token=${token}`);
             } catch (error) {
                 return res.status(500).json({
                     success: false,

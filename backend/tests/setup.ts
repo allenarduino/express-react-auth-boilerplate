@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { execSync } from 'child_process';
 import { setupTestDatabase, cleanupTestDatabase } from './db-setup';
 
 // Global test setup
@@ -9,14 +9,15 @@ beforeAll(async () => {
     process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
     process.env.EMAIL_PROVIDER = 'console';
     process.env.APP_URL = 'http://localhost:4000';
+    process.env.FRONTEND_URL = 'http://localhost:5173';
 
     // Setup test database
     await setupTestDatabase();
 });
 
 afterAll(async () => {
-    // Cleanup after all tests
     await cleanupTestDatabase();
+    execSync('npx prisma generate --schema=prisma/schema.prisma', { stdio: 'inherit' });
 });
 
 // Global test utilities

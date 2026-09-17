@@ -13,6 +13,7 @@ module.exports = {
     ],
     coverageDirectory: 'coverage',
     coverageReporters: ['text', 'lcov', 'html'],
+    setupFiles: ['<rootDir>/tests/env-preload.ts'],
     setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
     testTimeout: 30000,
     // Run tests in sequence to avoid database conflicts

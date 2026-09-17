@@ -14,7 +14,7 @@ export interface AuthRequest extends Request {
 
 /**
  * JWT Authentication Middleware
- * 
+ *
  * Behavior:
  * - Reads Authorization header "Bearer <token>"
  * - Verifies JWT token using env.JWT_SECRET
@@ -23,7 +23,6 @@ export interface AuthRequest extends Request {
  */
 export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
     try {
-        // Extract token from Authorization header
         const authHeader = req.headers.authorization;
 
         if (!authHeader) {
@@ -34,7 +33,6 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
             return;
         }
 
-        // Check if header starts with "Bearer "
         if (!authHeader.startsWith('Bearer ')) {
             res.status(401).json({
                 success: false,
@@ -43,7 +41,6 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
             return;
         }
 
-        // Extract token (remove "Bearer " prefix)
         const token = authHeader.substring(7);
 
         if (!token) {
@@ -54,10 +51,8 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
             return;
         }
 
-        // Verify JWT token
         const payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
 
-        // Check if payload has required fields
         if (!payload.sub || !payload.email) {
             res.status(401).json({
                 success: false,
@@ -66,17 +61,14 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
             return;
         }
 
-        // Attach user data to request
         (req as AuthRequest).user = {
             id: payload.sub,
             email: payload.email
         };
 
-        // Continue to next middleware/route handler
         next();
 
     } catch (error) {
-        // Handle JWT verification errors
         if (error instanceof jwt.JsonWebTokenError) {
             res.status(401).json({
                 success: false,
@@ -101,7 +93,6 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
             return;
         }
 
-        // Handle other errors
         res.status(401).json({
             success: false,
             error: 'Token verification failed'
@@ -118,7 +109,6 @@ export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFu
         const authHeader = req.headers.authorization;
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            // No token provided, continue without user data
             next();
             return;
         }
@@ -130,11 +120,9 @@ export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFu
             return;
         }
 
-        // Try to verify token
         const payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
 
         if (payload.sub && payload.email) {
-            // Attach user data if token is valid
             (req as AuthRequest).user = {
                 id: payload.sub,
                 email: payload.email
@@ -143,8 +131,7 @@ export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFu
 
         next();
 
-    } catch (error) {
-        // Token verification failed, continue without user data
+    } catch {
         next();
     }
 };

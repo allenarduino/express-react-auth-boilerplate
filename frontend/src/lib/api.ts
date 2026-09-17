@@ -41,12 +41,6 @@ api.interceptors.response.use(
         return response
     },
     (error) => {
-        // Handle 401 Unauthorized responses
-        if (error.response?.status === 401) {
-            // Token might be expired or invalid
-            // You can dispatch a logout action here if using Redux/Context
-            console.warn('Authentication token expired or invalid')
-        }
         return Promise.reject(error)
     }
 )

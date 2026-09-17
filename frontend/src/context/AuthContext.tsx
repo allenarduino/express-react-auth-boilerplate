@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
 
-        initializeAuth()
+        void initializeAuth()
     }, [])
 
     const fetchUserProfile = async (authToken: string) => {
@@ -87,12 +87,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         })
 
         const profileData = profileResponse.data.data
-        const userData = {
+        setUser({
             ...userResponse.data.data,
             profile: profileData.profile,
-        }
-
-        setUser(userData)
+        })
     }
 
     const login = async (credentials: LoginCredentials) => {

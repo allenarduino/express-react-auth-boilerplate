@@ -102,19 +102,13 @@ export class AuthService {
 
     /**
      * Authenticate user and return JWT token
-     * @param email - User's email address
-     * @param password - Plain text password
-     * @returns Promise<{ token: string }> - JWT token
-     * @throws Error if credentials are invalid or email not verified
      */
     async login(email: string, password: string): Promise<{ token: string }> {
-        // Find user by email
         const user = await this.authRepo.findByEmail(email);
         if (!user) {
             throw new Error('Invalid email or password');
         }
 
-        // Verify password
         if (!user.passwordHash) {
             throw new Error('Invalid email or password');
         }
@@ -123,20 +117,20 @@ export class AuthService {
             throw new Error('Invalid email or password');
         }
 
-        // Check if email is verified
         if (!user.isEmailVerified) {
             throw new Error('Please verify your email address before logging in');
         }
 
-        // Generate JWT token
-        const payload = {
-            sub: user.id,
-            email: user.email,
-        };
-
-        const token = jwt.sign(payload, env.JWT_SECRET, {
-            expiresIn: env.JWT_EXPIRES_IN,
-        } as jwt.SignOptions);
+        const token = jwt.sign(
+            {
+                sub: user.id,
+                email: user.email,
+            },
+            env.JWT_SECRET,
+            {
+                expiresIn: env.JWT_EXPIRES_IN,
+            } as jwt.SignOptions
+        );
 
         return { token };
     }

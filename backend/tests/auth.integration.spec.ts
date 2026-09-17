@@ -8,20 +8,31 @@ describe('Authentication Integration Tests', () => {
     let testUser: { email: string; password: string };
     let createdUserId: string;
     let verificationToken: string;
-    let authToken: string;
+
+    const signupAndVerify = async (email: string, password: string) => {
+        const signupResponse = await request(app)
+            .post('/api/auth/signup')
+            .send({ email, password })
+            .expect(201);
+
+        const id = signupResponse.body.data.id as string;
+        const userInDb = await prisma.user.findUnique({ where: { id } });
+        const token = userInDb?.verificationToken || '';
+
+        await request(app).get(`/api/auth/verify?token=${token}`).expect(200);
+
+        return { id, verificationToken: token };
+    };
 
     beforeAll(async () => {
-        // Reset database before each test suite
         await resetDatabase();
     });
 
     beforeEach(() => {
-        // Generate fresh test user for each test
         testUser = testUtils.generateTestUser();
     });
 
     afterAll(async () => {
-        // Clean up after all tests
         await resetDatabase();
     });
 
@@ -35,17 +46,14 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(201);
 
-            // Assert response structure
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('message');
             expect(response.body).toHaveProperty('data');
             expect(response.body.data).toHaveProperty('id');
             expect(response.body.data).toHaveProperty('email', testUser.email);
 
-            // Store created user ID for later tests
             createdUserId = response.body.data.id;
 
-            // Assert user was created in database
             const userInDb = await prisma.user.findUnique({
                 where: { id: createdUserId },
                 include: { profile: true },
@@ -57,7 +65,6 @@ describe('Authentication Integration Tests', () => {
             expect(userInDb?.verificationToken).toBeTruthy();
             expect(userInDb?.profile).toBeTruthy();
 
-            // Store verification token for later tests
             verificationToken = userInDb?.verificationToken || '';
         });
 
@@ -88,7 +95,6 @@ describe('Authentication Integration Tests', () => {
         });
 
         it('should return 400 for duplicate email', async () => {
-            // First signup
             await request(app)
                 .post('/api/auth/signup')
                 .send({
@@ -97,7 +103,6 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(201);
 
-            // Second signup with same email
             const response = await request(app)
                 .post('/api/auth/signup')
                 .send({
@@ -113,7 +118,6 @@ describe('Authentication Integration Tests', () => {
 
     describe('GET /api/auth/verify', () => {
         beforeEach(async () => {
-            // Create a user first
             const signupResponse = await request(app)
                 .post('/api/auth/signup')
                 .send({
@@ -123,7 +127,6 @@ describe('Authentication Integration Tests', () => {
 
             createdUserId = signupResponse.body.data.id;
 
-            // Get verification token from database
             const userInDb = await prisma.user.findUnique({
                 where: { id: createdUserId },
             });
@@ -135,7 +138,6 @@ describe('Authentication Integration Tests', () => {
                 .get(`/api/auth/verify?token=${verificationToken}`)
                 .expect(200);
 
-            // Assert response structure
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('message');
             expect(response.body).toHaveProperty('data');
@@ -143,7 +145,6 @@ describe('Authentication Integration Tests', () => {
             expect(response.body.data).toHaveProperty('email', testUser.email);
             expect(response.body.data).toHaveProperty('isEmailVerified', true);
 
-            // Assert user is verified in database
             const userInDb = await prisma.user.findUnique({
                 where: { id: createdUserId },
             });
@@ -173,25 +174,9 @@ describe('Authentication Integration Tests', () => {
 
     describe('POST /api/auth/login', () => {
         beforeEach(async () => {
-            // Create and verify a user first
-            const signupResponse = await request(app)
-                .post('/api/auth/signup')
-                .send({
-                    email: testUser.email,
-                    password: testUser.password,
-                });
-
-            createdUserId = signupResponse.body.data.id;
-
-            // Get verification token and verify email
-            const userInDb = await prisma.user.findUnique({
-                where: { id: createdUserId },
-            });
-            verificationToken = userInDb?.verificationToken || '';
-
-            await request(app)
-                .get(`/api/auth/verify?token=${verificationToken}`)
-                .expect(200);
+            const created = await signupAndVerify(testUser.email, testUser.password);
+            createdUserId = created.id;
+            verificationToken = created.verificationToken;
         });
 
         it('should login successfully with verified email', async () => {
@@ -203,18 +188,13 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
-            // Assert response structure
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('message');
             expect(response.body).toHaveProperty('data');
             expect(response.body.data).toHaveProperty('token');
-
-            // Store token for later tests
-            authToken = response.body.data.token;
         });
 
         it('should return 401 for unverified email', async () => {
-            // Create a new user without verifying
             const newTestUser = testUtils.generateTestUser();
             await request(app)
                 .post('/api/auth/signup')
@@ -262,45 +242,29 @@ describe('Authentication Integration Tests', () => {
     });
 
     describe('GET /api/auth/me', () => {
+        let authToken: string;
+
         beforeEach(async () => {
-            // Create, verify, and login a user first
-            const signupResponse = await request(app)
-                .post('/api/auth/signup')
-                .send({
-                    email: testUser.email,
-                    password: testUser.password,
-                });
+            const created = await signupAndVerify(testUser.email, testUser.password);
+            createdUserId = created.id;
 
-            createdUserId = signupResponse.body.data.id;
-
-            // Get verification token and verify email
-            const userInDb = await prisma.user.findUnique({
-                where: { id: createdUserId },
-            });
-            verificationToken = userInDb?.verificationToken || '';
-
-            await request(app)
-                .get(`/api/auth/verify?token=${verificationToken}`)
-                .expect(200);
-
-            // Login to get token
             const loginResponse = await request(app)
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
                     password: testUser.password,
-                });
+                })
+                .expect(200);
 
             authToken = loginResponse.body.data.token;
         });
 
-        it('should return user profile with valid token', async () => {
+        it('should return user profile with a valid token', async () => {
             const response = await request(app)
                 .get('/api/auth/me')
                 .set('Authorization', `Bearer ${authToken}`)
                 .expect(200);
 
-            // Assert response structure
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('data');
             expect(response.body.data).toHaveProperty('id', createdUserId);
@@ -338,45 +302,29 @@ describe('Authentication Integration Tests', () => {
     });
 
     describe('GET /api/user/me', () => {
+        let authToken: string;
+
         beforeEach(async () => {
-            // Create, verify, and login a user first
-            const signupResponse = await request(app)
-                .post('/api/auth/signup')
-                .send({
-                    email: testUser.email,
-                    password: testUser.password,
-                });
+            const created = await signupAndVerify(testUser.email, testUser.password);
+            createdUserId = created.id;
 
-            createdUserId = signupResponse.body.data.id;
-
-            // Get verification token and verify email
-            const userInDb = await prisma.user.findUnique({
-                where: { id: createdUserId },
-            });
-            verificationToken = userInDb?.verificationToken || '';
-
-            await request(app)
-                .get(`/api/auth/verify?token=${verificationToken}`)
-                .expect(200);
-
-            // Login to get token
             const loginResponse = await request(app)
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
                     password: testUser.password,
-                });
+                })
+                .expect(200);
 
             authToken = loginResponse.body.data.token;
         });
 
-        it('should return user profile with valid token', async () => {
+        it('should return user profile with a valid token', async () => {
             const response = await request(app)
                 .get('/api/user/me')
                 .set('Authorization', `Bearer ${authToken}`)
                 .expect(200);
 
-            // Assert response structure
             expect(response.body).toHaveProperty('success', true);
             expect(response.body).toHaveProperty('data');
             expect(response.body.data).toHaveProperty('id', createdUserId);
@@ -395,6 +343,112 @@ describe('Authentication Integration Tests', () => {
 
             expect(response.body).toHaveProperty('success', false);
             expect(response.body).toHaveProperty('error');
+        });
+    });
+
+    describe('password reset', () => {
+        it('should reset the password and allow login with the new password', async () => {
+            await signupAndVerify(testUser.email, testUser.password);
+
+            await request(app)
+                .post('/api/auth/forgot-password')
+                .send({ email: testUser.email })
+                .expect(200);
+
+            const userAfterForgot = await prisma.user.findUnique({
+                where: { email: testUser.email },
+            });
+            const resetToken = userAfterForgot?.passwordResetToken;
+            expect(resetToken).toBeTruthy();
+
+            const newPassword = 'newpassword123';
+            await request(app)
+                .post('/api/auth/reset-password')
+                .send({
+                    token: resetToken,
+                    password: newPassword,
+                })
+                .expect(200);
+
+            await request(app)
+                .post('/api/auth/login')
+                .send({
+                    email: testUser.email,
+                    password: testUser.password,
+                })
+                .expect(401);
+
+            const loginResponse = await request(app)
+                .post('/api/auth/login')
+                .send({
+                    email: testUser.email,
+                    password: newPassword,
+                })
+                .expect(200);
+
+            await request(app)
+                .get('/api/auth/me')
+                .set('Authorization', `Bearer ${loginResponse.body.data.token}`)
+                .expect(200);
+        });
+
+        it('should return 400 for an invalid reset token', async () => {
+            const response = await request(app)
+                .post('/api/auth/reset-password')
+                .send({
+                    token: 'not-a-real-reset-token',
+                    password: 'newpassword123',
+                })
+                .expect(400);
+
+            expect(response.body).toHaveProperty('success', false);
+        });
+    });
+
+    describe('DELETE /api/user/me', () => {
+        it('should delete the account and reject later logins', async () => {
+            const created = await signupAndVerify(testUser.email, testUser.password);
+            createdUserId = created.id;
+
+            const loginResponse = await request(app)
+                .post('/api/auth/login')
+                .send({
+                    email: testUser.email,
+                    password: testUser.password,
+                })
+                .expect(200);
+
+            const authToken = loginResponse.body.data.token as string;
+
+            await request(app)
+                .delete('/api/user/me')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ confirmEmail: 'wrong@example.com' })
+                .expect(400);
+
+            await request(app)
+                .delete('/api/user/me')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ confirmEmail: testUser.email })
+                .expect(200);
+
+            const userInDb = await prisma.user.findUnique({
+                where: { id: createdUserId },
+            });
+            expect(userInDb).toBeNull();
+
+            await request(app)
+                .get('/api/auth/me')
+                .set('Authorization', `Bearer ${authToken}`)
+                .expect(404);
+
+            await request(app)
+                .post('/api/auth/login')
+                .send({
+                    email: testUser.email,
+                    password: testUser.password,
+                })
+                .expect(401);
         });
     });
 });

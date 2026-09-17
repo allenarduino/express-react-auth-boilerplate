@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { authMiddleware } from '../presentation/middleware/auth';
+import { authWriteLimiter } from '../presentation/middleware/rateLimit';
 
 /**
  * Authentication routes
@@ -23,12 +24,12 @@ export function createAuthRoutes(authController?: AuthController): Router {
     const changePassword = controller.changePassword.bind(controller);
 
     // Public routes
-    router.post('/signup', signUp);
+    router.post('/signup', authWriteLimiter, signUp);
     router.get('/verify', verifyEmail);
-    router.post('/login', login);
+    router.post('/login', authWriteLimiter, login);
     router.post('/verify-token', verifyToken);
-    router.post('/resend-verification', resendVerification);
-    router.post('/forgot-password', forgotPassword);
+    router.post('/resend-verification', authWriteLimiter, resendVerification);
+    router.post('/forgot-password', authWriteLimiter, forgotPassword);
     router.post('/reset-password', resetPassword);
 
     // Google OAuth routes

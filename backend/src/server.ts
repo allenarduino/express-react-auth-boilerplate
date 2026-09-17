@@ -27,8 +27,10 @@ const corsOrigins = [
     env.FRONTEND_URL,
     'http://localhost:3000',
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
 ].filter((origin, index, list) => Boolean(origin) && list.indexOf(origin) === index);
 
 app.use(cors({
@@ -138,29 +140,32 @@ process.on('unhandledRejection', (reason, promise) => {
     gracefulShutdown('unhandledRejection');
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-    console.log('====================================');
-    console.log('🚀 Server is running!');
-    console.log(`📍 URL: http://localhost:${PORT}`);
-    console.log(`🌍 Environment: ${env.NODE_ENV || 'development'}`);
-    console.log(`📧 Email Provider: ${env.EMAIL_PROVIDER || 'console'}`);
-    console.log('====================================');
-    console.log('\n📋 Available endpoints:');
-    console.log('  GET  /health - Health check');
-    console.log('  POST /api/auth/signup - Register user');
-    console.log('  GET  /api/auth/verify?token=xxx - Verify email');
-    console.log('  POST /api/auth/login - Login user');
-    console.log('  GET  /api/auth/google - Google OAuth login');
-    console.log('  GET  /api/auth/google/callback - Google OAuth callback');
-    console.log('  GET  /api/auth/me - Get current user (protected)');
-    console.log('  POST /api/auth/change-password - Change password (protected)');
-    console.log('  GET  /api/user/me - Get user profile (protected)');
-    console.log('  PUT  /api/user/me/profile - Update profile (protected)');
-    console.log('  POST /api/user/me/avatar - Upload avatar (protected)');
-    console.log('  DELETE /api/user/me - Delete account (protected)');
-    console.log('====================================');
-});
+// Start server (supertest uses `app` directly in tests)
+let server: ReturnType<typeof app.listen> | undefined;
 
-// Export for testing
+if (env.NODE_ENV !== 'test') {
+    server = app.listen(PORT, () => {
+        console.log('====================================');
+        console.log('🚀 Server is running!');
+        console.log(`📍 URL: http://localhost:${PORT}`);
+        console.log(`🌍 Environment: ${env.NODE_ENV || 'development'}`);
+        console.log(`📧 Email Provider: ${env.EMAIL_PROVIDER || 'console'}`);
+        console.log('====================================');
+        console.log('\n📋 Available endpoints:');
+        console.log('  GET  /health - Health check');
+        console.log('  POST /api/auth/signup - Register user');
+        console.log('  GET  /api/auth/verify?token=xxx - Verify email');
+        console.log('  POST /api/auth/login - Login user');
+        console.log('  GET  /api/auth/google - Google OAuth login');
+        console.log('  GET  /api/auth/google/callback - Google OAuth callback');
+        console.log('  GET  /api/auth/me - Get current user (protected)');
+        console.log('  POST /api/auth/change-password - Change password (protected)');
+        console.log('  GET  /api/user/me - Get user profile (protected)');
+        console.log('  PUT  /api/user/me/profile - Update profile (protected)');
+        console.log('  POST /api/user/me/avatar - Upload avatar (protected)');
+        console.log('  DELETE /api/user/me - Delete account (protected)');
+        console.log('====================================');
+    });
+}
+
 export { app, server };
