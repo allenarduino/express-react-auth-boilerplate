@@ -91,6 +91,8 @@ export type UserProfileData = {
     id: string
     email: string
     isEmailVerified: boolean
+    googlePicture?: string | null
+    googleName?: string | null
     profile: {
         name: string | null
         bio: string | null

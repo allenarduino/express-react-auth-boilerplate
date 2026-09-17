@@ -23,12 +23,12 @@ export function UserAvatarDropdown() {
         <div className="relative" ref={dropdownRef}>
             <button
                 type="button"
-                className="flex items-center space-x-2"
+                className="flex items-center gap-1.5 rounded-full p-0.5 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
                 onClick={() => setIsOpen(!isOpen)}
                 aria-expanded={isOpen}
                 aria-haspopup="menu"
             >
-                <UserAvatar user={user} size="md" className="ring-2 ring-primary-light/60" />
+                <UserAvatar user={user} size="md" />
                 <svg
                     className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
                     fill="none"

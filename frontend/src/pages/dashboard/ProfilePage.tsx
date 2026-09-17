@@ -74,7 +74,7 @@ export const ProfilePage: React.FC = () => {
               id: profile.id,
               email: profile.email,
               name: form.name || user?.name,
-              googlePicture: avatarCleared || form.avatarUrl ? undefined : user?.googlePicture,
+              googlePicture: avatarCleared || form.avatarUrl ? undefined : profile.googlePicture || user?.googlePicture,
               profile: {
                   name: form.name || undefined,
                   avatarUrl: displayAvatarUrl || undefined,

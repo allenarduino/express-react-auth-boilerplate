@@ -7,6 +7,8 @@ export interface UserProfileData {
     id: string;
     email: string;
     isEmailVerified: boolean;
+    googlePicture: string | null;
+    googleName: string | null;
     profile: {
         name: string | null;
         bio: string | null;
@@ -61,6 +63,8 @@ export class UserService {
             id: userWithProfile.id,
             email: userWithProfile.email,
             isEmailVerified: userWithProfile.isEmailVerified,
+            googlePicture: userWithProfile.googlePicture,
+            googleName: userWithProfile.googleName,
             profile: {
                 name: userWithProfile.profile.name,
                 bio: userWithProfile.profile.bio,
@@ -137,6 +141,8 @@ export class UserService {
             id: user.id,
             email: user.email,
             isEmailVerified: user.isEmailVerified,
+            googlePicture: user.googlePicture,
+            googleName: user.googleName,
             profile: {
                 name: updatedProfile.name,
                 bio: updatedProfile.bio,
@@ -163,10 +169,16 @@ export class UserService {
     /**
      * Get user basic info without profile data
      * @param userId - The user ID to get info for
-     * @returns Promise<{ id: string; email: string; isEmailVerified: boolean }> - Basic user info
+     * @returns Promise<{ id: string; email: string; isEmailVerified: boolean; googlePicture: string | null; googleName: string | null }> - Basic user info
      * @throws Error if user not found
      */
-    async getUserInfo(userId: string): Promise<{ id: string; email: string; isEmailVerified: boolean }> {
+    async getUserInfo(userId: string): Promise<{
+        id: string
+        email: string
+        isEmailVerified: boolean
+        googlePicture: string | null
+        googleName: string | null
+    }> {
         if (!userId || typeof userId !== 'string' || userId.trim() === '') {
             throw new Error('User ID is required and must be a non-empty string');
         }

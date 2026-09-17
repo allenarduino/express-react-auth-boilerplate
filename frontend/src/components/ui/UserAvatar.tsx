@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { User } from '../../context/AuthContext'
 
 interface UserAvatarProps {
@@ -8,10 +9,10 @@ interface UserAvatarProps {
 
 export function UserAvatar({ user, size = 'md', className = '' }: UserAvatarProps) {
     const sizeClasses = {
-        sm: 'w-8 h-8',
-        md: 'w-10 h-10',
-        lg: 'w-12 h-12',
-        xl: 'w-24 h-24',
+        sm: 'h-8 w-8',
+        md: 'h-10 w-10',
+        lg: 'h-12 w-12',
+        xl: 'h-24 w-24',
     }
 
     const textSizeClasses = {
@@ -41,38 +42,34 @@ export function UserAvatar({ user, size = 'md', className = '' }: UserAvatarProp
         return currentUser.email.slice(0, 2).toUpperCase()
     }
 
-    const avatarUrl = user?.profile?.avatarUrl || user?.googlePicture
+    const avatarUrl = user?.profile?.avatarUrl || user?.googlePicture || null
+    const [imageFailed, setImageFailed] = useState(false)
 
-    if (avatarUrl) {
-        return (
-            <div className="relative">
-                <img
-                    src={avatarUrl}
-                    alt={user.profile?.name || user.name || user.email}
-                    className={`${sizeClasses[size]} rounded-full object-cover ${className}`}
-                    onError={(e) => {
-                        ;(e.target as HTMLImageElement).style.display = 'none'
-                        const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement
-                        if (fallback) fallback.style.display = 'flex'
-                    }}
-                />
-                <div
-                    className={`${sizeClasses[size]} absolute top-0 left-0 flex items-center justify-center rounded-full bg-primary-light ${className}`}
-                    style={{ display: 'none' }}
-                >
-                    <span className={`${textSizeClasses[size]} font-medium text-primary-dark`}>
-                        {user ? getInitials(user) : '?'}
-                    </span>
-                </div>
-            </div>
-        )
-    }
+    useEffect(() => {
+        setImageFailed(false)
+    }, [avatarUrl])
+
+    const showImage = Boolean(avatarUrl) && !imageFailed
 
     return (
-        <div className={`${sizeClasses[size]} flex items-center justify-center rounded-full bg-primary-light ${className}`}>
-            <span className={`${textSizeClasses[size]} font-medium text-primary-dark`}>
-                {user ? getInitials(user) : '?'}
-            </span>
+        <div
+            className={`${sizeClasses[size]} shrink-0 overflow-hidden rounded-full ${
+                showImage ? 'bg-gray-100' : 'flex items-center justify-center bg-gray-200'
+            } ${className}`}
+        >
+            {showImage ? (
+                <img
+                    src={avatarUrl!}
+                    alt={user?.profile?.name || user?.name || user?.email || 'Profile'}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                    onError={() => setImageFailed(true)}
+                />
+            ) : (
+                <span className={`${textSizeClasses[size]} font-medium text-gray-700`}>
+                    {user ? getInitials(user) : '?'}
+                </span>
+            )}
         </div>
     )
 }

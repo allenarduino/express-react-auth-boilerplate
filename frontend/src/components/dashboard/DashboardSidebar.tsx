@@ -29,11 +29,11 @@ export function DashboardSidebar({ open, setOpen }: DashboardSidebarProps) {
 
             <div
                 className={`
-          fixed inset-y-0 left-0 z-50 flex w-64 transform flex-col bg-white py-0 shadow-lg transition-transform duration-300 ease-in-out md:py-12 lg:translate-x-0
+          fixed bottom-0 left-0 top-16 z-50 flex w-64 transform flex-col bg-white shadow-lg transition-transform duration-300 ease-in-out lg:translate-x-0
           ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
             >
-                <div className="flex flex-shrink-0 items-center justify-end px-6 py-3">
+                <div className="flex flex-shrink-0 items-center justify-end px-6 py-3 lg:hidden">
                     <button
                         type="button"
                         onClick={() => setOpen(false)}

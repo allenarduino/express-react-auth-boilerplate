@@ -31,13 +31,21 @@ export class UserRepository {
      * @param userId - The user ID to get info for
      * @returns Promise<{ id: string; email: string; isEmailVerified: boolean } | null> - Basic user info
      */
-    async findUserBasicInfo(userId: string): Promise<{ id: string; email: string; isEmailVerified: boolean } | null> {
+    async findUserBasicInfo(userId: string): Promise<{
+        id: string
+        email: string
+        isEmailVerified: boolean
+        googlePicture: string | null
+        googleName: string | null
+    } | null> {
         const user = await this.prisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
                 email: true,
                 isEmailVerified: true,
+                googlePicture: true,
+                googleName: true,
             },
         });
         return user;

@@ -4,6 +4,17 @@ import { AuthRepository } from './auth.repository';
 import { UserRepository } from '../user/user.repository';
 import { env, isGoogleAuthConfigured } from '../config/env';
 
+function googleProfilePhoto(profile: {
+    photos?: Array<{ value: string }> | undefined
+    _json?: { picture?: string }
+}): string | undefined {
+    const url = profile.photos?.[0]?.value || profile._json?.picture
+    if (!url) {
+        return undefined
+    }
+    return url.replace(/=s\d+-c\b/, '=s128-c')
+}
+
 /**
  * Google OAuth Strategy configuration
  */
@@ -20,6 +31,8 @@ export function configureGoogleStrategy(): void {
         callbackURL: `${env.APP_URL}/api/auth/google/callback`
     }, async (accessToken, refreshToken, profile, done) => {
         try {
+            const picture = googleProfilePhoto(profile)
+
             // Check if user already exists with this Google ID
             let user = await authRepo.findByGoogleId(profile.id);
 
@@ -27,20 +40,18 @@ export function configureGoogleStrategy(): void {
                 // User exists, update their Google info if needed
                 if (user.googleEmail !== profile.emails?.[0]?.value ||
                     user.googleName !== profile.displayName ||
-                    user.googlePicture !== profile.photos?.[0]?.value) {
+                    user.googlePicture !== picture) {
 
                     user = await authRepo.updateGoogleInfo(user.id, {
                         ...(profile.emails?.[0]?.value && { googleEmail: profile.emails[0].value }),
                         ...(profile.displayName && { googleName: profile.displayName }),
-                        ...(profile.photos?.[0]?.value && { googlePicture: profile.photos[0].value })
+                        ...(picture && { googlePicture: picture })
                     });
 
-                    // Update user's profile with latest Google picture
-                    if (profile.photos?.[0]?.value) {
-                        const userRepo = new UserRepository();
+                    if (picture) {
                         await userRepo.updateProfile(user.id, {
                             name: profile.displayName || null,
-                            avatarUrl: profile.photos[0].value
+                            avatarUrl: picture
                         });
                     }
                 }
@@ -55,17 +66,15 @@ export function configureGoogleStrategy(): void {
                     googleId: profile.id,
                     ...(profile.emails?.[0]?.value && { googleEmail: profile.emails[0].value }),
                     ...(profile.displayName && { googleName: profile.displayName }),
-                    ...(profile.photos?.[0]?.value && { googlePicture: profile.photos[0].value })
+                    ...(picture && { googlePicture: picture })
                 });
 
-                // Update existing user's profile with Google picture if they don't have an avatar
-                if (profile.photos?.[0]?.value) {
-                    const userRepo = new UserRepository();
+                if (picture) {
                     const currentProfile = await userRepo.findProfileByUserId(existingUser.id);
                     if (currentProfile && !currentProfile.avatarUrl) {
                         await userRepo.updateProfile(existingUser.id, {
                             name: profile.displayName || currentProfile.name,
-                            avatarUrl: profile.photos[0].value
+                            avatarUrl: picture
                         });
                     }
                 }
@@ -79,14 +88,13 @@ export function configureGoogleStrategy(): void {
                 googleId: profile.id,
                 ...(profile.emails?.[0]?.value && { googleEmail: profile.emails[0].value }),
                 ...(profile.displayName && { googleName: profile.displayName }),
-                ...(profile.photos?.[0]?.value && { googlePicture: profile.photos[0].value }),
+                ...(picture && { googlePicture: picture }),
                 isEmailVerified: true // Google emails are pre-verified
             });
 
-            // Create profile for the new user with Google picture as avatar
             await userRepo.createProfileWithAvatar(user.id, {
                 name: profile.displayName || null,
-                avatarUrl: profile.photos?.[0]?.value || null
+                avatarUrl: picture || null
             });
 
             return done(null, user);

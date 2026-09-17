@@ -57,6 +57,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const profileData = profileResponse.data.data
         setUser({
             ...userResponse.data.data,
+            googlePicture: userResponse.data.data.googlePicture || profileData.googlePicture,
+            name: userResponse.data.data.name || profileData.googleName || profileData.profile?.name,
             profile: profileData.profile,
         })
     }
