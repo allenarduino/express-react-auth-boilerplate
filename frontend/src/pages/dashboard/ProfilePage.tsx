@@ -1,89 +1,166 @@
-import React, { useState, useEffect } from 'react'
-import api from '../../lib/api'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { DashboardLayout } from '../../layouts/DashboardLayout'
+import { useAuth } from '../../hooks/useAuth'
+import {
+    fetchUserProfile,
+    getApiErrorMessage,
+    updateUserProfile,
+    uploadUserAvatar,
+    type UserProfileData,
+} from '../../lib/api'
+import { cropImageToSquareJpeg } from '../../lib/cropImage'
+import { UserAvatar } from '../../components/ui/UserAvatar'
+import { ToastViewport, useToast } from '../../components/ui/toast'
+import type { User } from '../../context/AuthContext'
 
-// User profile interface
-interface UserProfile {
-    id: string
-    email: string
-    isEmailVerified: boolean
-    profile?: {
-        name?: string
-        bio?: string
-        avatarUrl?: string
-        website?: string
+const PROFILE_PAGE_MAX_WIDTH = 'mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl'
+
+function profileToForm(profile: UserProfileData) {
+    return {
+        name: profile.profile.name ?? '',
+        bio: profile.profile.bio ?? '',
+        website: profile.profile.website ?? '',
+        avatarUrl: profile.profile.avatarUrl ?? '',
     }
 }
 
+function Spinner({ className = 'h-8 w-8' }: { className?: string }) {
+    return (
+        <svg className={`animate-spin text-gray-400 ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+    )
+}
+
 export const ProfilePage: React.FC = () => {
-    const [user, setUser] = useState<UserProfile | null>(null)
+    const { user, refreshUser } = useAuth()
+    const { toasts, showToast } = useToast()
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const [profile, setProfile] = useState<UserProfileData | null>(null)
+    const [form, setForm] = useState({ name: '', bio: '', website: '', avatarUrl: '' })
     const [isLoading, setIsLoading] = useState(true)
+    const [isSaving, setIsSaving] = useState(false)
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+    const [avatarCleared, setAvatarCleared] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // Fetch user profile on mount
+    const loadProfile = useCallback(async () => {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const data = await fetchUserProfile()
+            setProfile(data)
+            setForm(profileToForm(data))
+            setAvatarCleared(false)
+        } catch (err) {
+            setError(getApiErrorMessage(err))
+        } finally {
+            setIsLoading(false)
+        }
+    }, [])
+
     useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                setIsLoading(true)
-                const response = await api.get('/user/me')
-                const userData = response.data
-                setUser(userData)
-            } catch (error: any) {
-                console.error('Failed to fetch profile:', error)
-                setError(
-                    error?.response?.data?.message ||
-                    'Failed to load profile. Please try again.'
-                )
-            } finally {
-                setIsLoading(false)
-            }
+        void loadProfile()
+    }, [loadProfile])
+
+    const displayAvatarUrl = avatarCleared
+        ? form.avatarUrl || null
+        : form.avatarUrl || profile?.profile.avatarUrl || null
+
+    const previewUser: User | null = profile
+        ? {
+              id: profile.id,
+              email: profile.email,
+              name: form.name || user?.name,
+              googlePicture: avatarCleared || form.avatarUrl ? undefined : user?.googlePicture,
+              profile: {
+                  name: form.name || undefined,
+                  avatarUrl: displayAvatarUrl || undefined,
+              },
+          }
+        : user
+
+    const handleAvatarPick = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        event.target.value = ''
+        if (!file) return
+
+        try {
+            setIsUploadingAvatar(true)
+            const dataUrl = await cropImageToSquareJpeg(file)
+            const uploaded = await uploadUserAvatar(dataUrl)
+            setAvatarCleared(false)
+            setForm((prev) => ({ ...prev, avatarUrl: uploaded.url }))
+            setProfile(uploaded.profile)
+            await refreshUser()
+            showToast('Photo updated', 'success')
+        } catch (err) {
+            showToast(getApiErrorMessage(err), 'error')
+        } finally {
+            setIsUploadingAvatar(false)
+        }
+    }
+
+    const handleRemoveAvatar = () => {
+        setAvatarCleared(true)
+        setForm((prev) => ({ ...prev, avatarUrl: '' }))
+    }
+
+    const normalizeWebsite = (value: string) => {
+        const trimmed = value.trim()
+        if (!trimmed) return null
+        if (/^https?:\/\//i.test(trimmed)) return trimmed
+        return `https://${trimmed}`
+    }
+
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault()
+        if (!profile) return
+
+        const trimmedName = form.name.trim()
+        if (!trimmedName) {
+            showToast('Full name is required', 'error')
+            return
         }
 
-        fetchProfile()
-    }, [])
+        try {
+            setIsSaving(true)
+            const updated = await updateUserProfile({
+                name: trimmedName,
+                bio: form.bio.trim() || null,
+                website: normalizeWebsite(form.website),
+                avatarUrl: form.avatarUrl.trim() || null,
+            })
+            setProfile(updated)
+            setForm(profileToForm(updated))
+            setAvatarCleared(false)
+            await refreshUser()
+            showToast('Profile updated', 'success')
+        } catch (err) {
+            showToast(getApiErrorMessage(err), 'error')
+        } finally {
+            setIsSaving(false)
+        }
+    }
 
     if (isLoading) {
         return (
             <DashboardLayout>
-                <div className="max-w-4xl mx-auto">
-                    <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    </div>
+                <div className={`flex h-64 items-center justify-center ${PROFILE_PAGE_MAX_WIDTH}`}>
+                    <Spinner />
                 </div>
             </DashboardLayout>
         )
     }
 
-    if (error) {
+    if (error || !profile) {
         return (
             <DashboardLayout>
-                <div className="max-w-4xl mx-auto">
-                    <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-800">Error</h3>
-                                <div className="mt-2 text-sm text-red-700">
-                                    <p>{error}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </DashboardLayout>
-        )
-    }
-
-    if (!user) {
-        return (
-            <DashboardLayout>
-                <div className="max-w-4xl mx-auto">
-                    <div className="text-center py-12">
-                        <p className="text-gray-500">No profile data available.</p>
+                <div className={PROFILE_PAGE_MAX_WIDTH}>
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        {error || 'Could not load profile.'}
                     </div>
                 </div>
             </DashboardLayout>
@@ -92,113 +169,165 @@ export const ProfilePage: React.FC = () => {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto">
-                <div className="bg-white shadow rounded-lg">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <h1 className="text-2xl font-semibold text-gray-900">Profile Information</h1>
+            <ToastViewport toasts={toasts} />
+            <div className={PROFILE_PAGE_MAX_WIDTH}>
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-200 px-6 py-5 lg:px-8">
+                        <h1 className="text-2xl font-semibold text-gray-900">Profile</h1>
                         <p className="mt-1 text-sm text-gray-600">
-                            View your account information and profile details.
+                            Update your photo, name, and public details.
                         </p>
                     </div>
 
-                    <div className="px-6 py-6 space-y-6">
-                        {/* Avatar Display */}
-                        {user.profile?.avatarUrl && (
-                            <div className="flex items-center space-x-4">
-                                <div className="flex-shrink-0">
-                                    <img
-                                        className="h-16 w-16 rounded-full object-cover"
-                                        src={user.profile.avatarUrl}
-                                        alt="Profile avatar"
-                                    />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-medium text-gray-900">Profile Picture</h3>
-                                    <p className="text-sm text-gray-500">Your current profile picture</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* User Information */}
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                            {/* Name */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Name</label>
-                                <div className="mt-1 text-sm text-gray-900">
-                                    {user.profile?.name || 'Not set'}
-                                </div>
+                    <form onSubmit={(e) => void handleSubmit(e)} className="px-6 py-6 lg:px-8">
+                        <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                            <div className="relative shrink-0 self-start">
+                                <UserAvatar user={previewUser} size="xl" />
+                                {isUploadingAvatar ? (
+                                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                                        <Spinner className="h-6 w-6 text-white" />
+                                    </div>
+                                ) : null}
                             </div>
 
-                            {/* Email */}
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-900">Profile photo</p>
+                                <p className="text-sm text-gray-500">JPG, PNG, or WebP. Cropped to a square.</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={isUploadingAvatar || isSaving}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        {form.avatarUrl ? 'Change photo' : 'Upload photo'}
+                                    </button>
+                                    {form.avatarUrl || (!avatarCleared && (profile.profile.avatarUrl || user?.googlePicture)) ? (
+                                        <button
+                                            type="button"
+                                            disabled={isUploadingAvatar || isSaving}
+                                            onClick={handleRemoveAvatar}
+                                            className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                        >
+                                            Remove
+                                        </button>
+                                    ) : null}
+                                </div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => void handleAvatarPick(e)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Email Address</label>
-                                <div className="mt-1 text-sm text-gray-900">{user.email}</div>
-                                <div className="mt-1 flex items-center">
-                                    {user.isEmailVerified ? (
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                            </svg>
+                                <label htmlFor="profile-name" className="block text-sm font-medium text-gray-700">
+                                    Full name
+                                </label>
+                                <input
+                                    id="profile-name"
+                                    type="text"
+                                    value={form.name}
+                                    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                                    maxLength={100}
+                                    required
+                                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+                                    placeholder="Your full name"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700">
+                                    Email
+                                </label>
+                                <input
+                                    id="profile-email"
+                                    type="email"
+                                    value={profile.email}
+                                    readOnly
+                                    className="mt-1 block w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+                                />
+                                <div className="mt-2">
+                                    {profile.isEmailVerified ? (
+                                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                                             Verified
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                            </svg>
+                                        <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
                                             Unverified
                                         </span>
                                     )}
                                 </div>
+                                <p className="mt-1 text-xs text-gray-500">Email cannot be changed here.</p>
                             </div>
 
-                            {/* Bio */}
-                            <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Bio</label>
-                                <div className="mt-1 text-sm text-gray-900">
-                                    {user.profile?.bio || 'No bio provided'}
-                                </div>
+                            <div>
+                                <label htmlFor="profile-website" className="block text-sm font-medium text-gray-700">
+                                    Website
+                                </label>
+                                <input
+                                    id="profile-website"
+                                    type="text"
+                                    value={form.website}
+                                    onChange={(e) => setForm((prev) => ({ ...prev, website: e.target.value }))}
+                                    maxLength={200}
+                                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+                                    placeholder="https://your-site.com"
+                                />
                             </div>
 
-                            {/* Website */}
-                            <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Website</label>
-                                <div className="mt-1 text-sm text-gray-900">
-                                    {user.profile?.website ? (
-                                        <a
-                                            href={user.profile.website}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-500"
-                                        >
-                                            {user.profile.website}
-                                        </a>
-                                    ) : (
-                                        'No website provided'
-                                    )}
-                                </div>
+                            <div className="lg:col-span-2">
+                                <label htmlFor="profile-bio" className="block text-sm font-medium text-gray-700">
+                                    Bio
+                                </label>
+                                <textarea
+                                    id="profile-bio"
+                                    value={form.bio}
+                                    onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value }))}
+                                    maxLength={500}
+                                    rows={4}
+                                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+                                    placeholder="A short introduction"
+                                />
                             </div>
                         </div>
 
-                        {/* Account Information */}
-                        <div className="border-t border-gray-200 pt-6">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Account Information</h3>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">User ID</label>
-                                    <div className="mt-1 text-sm text-gray-900 font-mono">{user.id}</div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Account Status</label>
-                                    <div className="mt-1">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            Active
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                        <div className="mt-8 flex items-center justify-end gap-3 border-t border-gray-200 pt-6">
+                            <button
+                                type="button"
+                                disabled={isSaving || isUploadingAvatar}
+                                onClick={() => {
+                                    setForm(profileToForm(profile))
+                                    setAvatarCleared(false)
+                                }}
+                                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                            >
+                                Reset
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSaving || isUploadingAvatar}
+                                className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <Spinner className="h-4 w-4 text-white" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save profile'
+                                )}
+                            </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </DashboardLayout>

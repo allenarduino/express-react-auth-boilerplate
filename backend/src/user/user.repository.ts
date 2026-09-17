@@ -190,4 +190,13 @@ export class UserRepository {
             orderBy: { createdAt: 'desc' },
         });
     }
+
+    /**
+     * Permanently delete a user and related records (Prisma cascades the profile).
+     */
+    async deleteUser(userId: string): Promise<void> {
+        await this.prisma.user.delete({
+            where: { id: userId },
+        });
+    }
 }

@@ -1,4 +1,4 @@
-# Express React Auth Boilerplate
+# Auth Starter
 
 A Node.js + TypeScript project scaffold with Express, Prisma, and authentication utilities.
 

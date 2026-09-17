@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { UserService } from './user.service';
 import { UserRepository } from './user.repository';
-import { updateProfileSchema } from './user.validation';
+import { deleteAccountSchema, updateProfileSchema, uploadAvatarSchema } from './user.validation';
+import { saveAvatarFromDataUrl } from './avatar';
+import { env } from '../config/env';
 
 /**
  * User controller for handling profile-related HTTP requests
@@ -81,13 +83,11 @@ export class UserController {
             }
 
             const updateData = validationResult.data;
-
-            // Transform undefined values to null to match ProfileUpdateData interface
             const transformedData = {
-                name: updateData.name ?? null,
-                bio: updateData.bio ?? null,
-                avatarUrl: updateData.avatarUrl ?? null,
-                website: updateData.website ?? null,
+                ...(updateData.name !== undefined ? { name: updateData.name } : {}),
+                ...(updateData.bio !== undefined ? { bio: updateData.bio } : {}),
+                ...(updateData.avatarUrl !== undefined ? { avatarUrl: updateData.avatarUrl } : {}),
+                ...(updateData.website !== undefined ? { website: updateData.website } : {}),
             };
 
             const updatedProfile = await this.userService.updateProfile(userId, transformedData);
@@ -127,6 +127,108 @@ export class UserController {
                 success: true,
                 message: 'User info retrieved successfully',
                 data: userInfo,
+            });
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                message: (error as Error).message,
+            });
+        }
+    }
+
+    /**
+     * POST /api/user/me/avatar
+     * Upload a cropped profile photo (JPEG data URL)
+     */
+    async uploadAvatar(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = (req as any).user?.id;
+
+            if (!userId) {
+                res.status(401).json({
+                    success: false,
+                    message: 'User not authenticated',
+                });
+                return;
+            }
+
+            const validationResult = uploadAvatarSchema.safeParse(req.body);
+            if (!validationResult.success) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Validation failed',
+                    errors: validationResult.error.issues.map((err: any) => ({
+                        field: err.path.join('.'),
+                        message: err.message,
+                    })),
+                });
+                return;
+            }
+
+            const relativePath = await saveAvatarFromDataUrl(userId, validationResult.data.image);
+            const avatarUrl = `${env.APP_URL}${relativePath}?t=${Date.now()}`;
+            const updatedProfile = await this.userService.updateProfile(userId, { avatarUrl });
+
+            res.status(200).json({
+                success: true,
+                message: 'Avatar uploaded successfully',
+                data: {
+                    url: avatarUrl,
+                    profile: updatedProfile,
+                },
+            });
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                message: (error as Error).message,
+            });
+        }
+    }
+
+    /**
+     * DELETE /api/user/me
+     * Permanently delete the authenticated user's account.
+     */
+    async deleteAccount(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = (req as any).user?.id;
+            const tokenEmail = (req as any).user?.email as string | undefined;
+
+            if (!userId || !tokenEmail) {
+                res.status(401).json({
+                    success: false,
+                    message: 'User not authenticated',
+                });
+                return;
+            }
+
+            const validationResult = deleteAccountSchema.safeParse(req.body || {});
+            if (!validationResult.success) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Validation failed',
+                    errors: validationResult.error.issues.map((err: any) => ({
+                        field: err.path.join('.'),
+                        message: err.message,
+                    })),
+                });
+                return;
+            }
+
+            const typed = validationResult.data.confirmEmail.trim().toLowerCase();
+            if (typed !== tokenEmail.trim().toLowerCase()) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Confirmation email does not match your account email',
+                });
+                return;
+            }
+
+            await this.userService.deleteAccount(userId);
+
+            res.status(200).json({
+                success: true,
+                message: 'Account deleted successfully',
             });
         } catch (error) {
             res.status(400).json({

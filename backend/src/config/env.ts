@@ -7,6 +7,7 @@ dotenv.config();
 interface EnvConfig {
     // App configuration
     APP_URL: string;
+    FRONTEND_URL: string;
     PORT: number;
     NODE_ENV: string;
 
@@ -52,8 +53,9 @@ if (missingEnvVars.length > 0) {
 // Export typed environment configuration
 export const env: EnvConfig = {
     // App configuration
-    APP_URL: process.env.APP_URL || 'http://localhost:3000',
-    PORT: parseInt(process.env.PORT || '3000', 10),
+    APP_URL: process.env.APP_URL || 'http://localhost:4000',
+    FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
+    PORT: parseInt(process.env.PORT || '4000', 10),
     NODE_ENV: process.env.NODE_ENV || 'development',
 
     // Database
@@ -81,6 +83,7 @@ export const env: EnvConfig = {
 // Export individual constants for convenience
 export const {
     APP_URL,
+    FRONTEND_URL,
     PORT,
     NODE_ENV,
     DATABASE_URL,

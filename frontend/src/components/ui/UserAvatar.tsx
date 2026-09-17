@@ -1,46 +1,47 @@
-import { User } from '../../context/AuthContext';
+import { User } from '../../context/AuthContext'
 
 interface UserAvatarProps {
-    user: User | null;
-    size?: 'sm' | 'md' | 'lg';
-    className?: string;
+    user: User | null
+    size?: 'sm' | 'md' | 'lg' | 'xl'
+    className?: string
 }
 
 export function UserAvatar({ user, size = 'md', className = '' }: UserAvatarProps) {
     const sizeClasses = {
         sm: 'w-8 h-8',
         md: 'w-10 h-10',
-        lg: 'w-12 h-12'
-    };
+        lg: 'w-12 h-12',
+        xl: 'w-24 h-24',
+    }
 
     const textSizeClasses = {
         sm: 'text-xs',
         md: 'text-sm',
-        lg: 'text-base'
-    };
+        lg: 'text-base',
+        xl: 'text-2xl',
+    }
 
-    const getInitials = (user: User) => {
-        if (user.profile?.name) {
-            return user.profile.name
+    const getInitials = (currentUser: User) => {
+        if (currentUser.profile?.name) {
+            return currentUser.profile.name
                 .split(' ')
-                .map(n => n[0])
+                .map((n) => n[0])
                 .join('')
                 .toUpperCase()
-                .slice(0, 2);
+                .slice(0, 2)
         }
-        if (user.name) {
-            return user.name
+        if (currentUser.name) {
+            return currentUser.name
                 .split(' ')
-                .map(n => n[0])
+                .map((n) => n[0])
                 .join('')
                 .toUpperCase()
-                .slice(0, 2);
+                .slice(0, 2)
         }
-        return user.email.slice(0, 2).toUpperCase();
-    };
+        return currentUser.email.slice(0, 2).toUpperCase()
+    }
 
-    // Check for avatar URL with fallback handling
-    const avatarUrl = user?.profile?.avatarUrl || user?.googlePicture;
+    const avatarUrl = user?.profile?.avatarUrl || user?.googlePicture
 
     if (avatarUrl) {
         return (
@@ -50,15 +51,13 @@ export function UserAvatar({ user, size = 'md', className = '' }: UserAvatarProp
                     alt={user.profile?.name || user.name || user.email}
                     className={`${sizeClasses[size]} rounded-full object-cover ${className}`}
                     onError={(e) => {
-                        // Hide the image and show initials fallback if image fails to load
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                        if (fallback) fallback.style.display = 'flex';
+                        ;(e.target as HTMLImageElement).style.display = 'none'
+                        const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement
+                        if (fallback) fallback.style.display = 'flex'
                     }}
                 />
-                {/* Fallback initials - hidden by default */}
                 <div
-                    className={`${sizeClasses[size]} rounded-full bg-primary-light flex items-center justify-center ${className} absolute top-0 left-0`}
+                    className={`${sizeClasses[size]} absolute top-0 left-0 flex items-center justify-center rounded-full bg-primary-light ${className}`}
                     style={{ display: 'none' }}
                 >
                     <span className={`${textSizeClasses[size]} font-medium text-primary-dark`}>
@@ -66,14 +65,14 @@ export function UserAvatar({ user, size = 'md', className = '' }: UserAvatarProp
                     </span>
                 </div>
             </div>
-        );
+        )
     }
 
     return (
-        <div className={`${sizeClasses[size]} rounded-full bg-primary-light flex items-center justify-center ${className}`}>
+        <div className={`${sizeClasses[size]} flex items-center justify-center rounded-full bg-primary-light ${className}`}>
             <span className={`${textSizeClasses[size]} font-medium text-primary-dark`}>
                 {user ? getInitials(user) : '?'}
             </span>
         </div>
-    );
+    )
 }

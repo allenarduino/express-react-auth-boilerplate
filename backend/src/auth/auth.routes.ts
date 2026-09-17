@@ -20,6 +20,7 @@ export function createAuthRoutes(authController?: AuthController): Router {
     const getMe = controller.getMe.bind(controller);
     const googleLogin = controller.googleLogin.bind(controller);
     const googleCallback = controller.googleCallback.bind(controller);
+    const changePassword = controller.changePassword.bind(controller);
 
     // Public routes
     router.post('/signup', signUp);
@@ -37,6 +38,7 @@ export function createAuthRoutes(authController?: AuthController): Router {
 
     // Protected routes
     router.get('/me', authMiddleware, getMe);
+    router.post('/change-password', authMiddleware, changePassword);
 
     return router;
 }

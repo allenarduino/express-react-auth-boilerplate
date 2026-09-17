@@ -1,4 +1,4 @@
-# Makefile for Express React Auth Boilerplate
+# Makefile for Auth Starter
 
 .PHONY: run-local down-local clean logs backend-logs frontend-logs db-logs migrate test
 

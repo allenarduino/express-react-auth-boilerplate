@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import path from 'path';
 import passport from 'passport';
 import { config } from 'dotenv';
 import { createAuthRoutes } from './auth';
@@ -22,13 +23,16 @@ const app = express();
 const PORT = env.PORT || 4000;
 
 // CORS configuration
+const corsOrigins = [
+    env.FRONTEND_URL,
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+].filter((origin, index, list) => Boolean(origin) && list.indexOf(origin) === index);
+
 app.use(cors({
-    origin: [
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:5173'
-    ],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -53,8 +57,9 @@ const userController = new UserController(userService);
 configureGoogleStrategy();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '3mb' }));
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Initialize Passport middleware
 app.use(passport.initialize());
@@ -149,8 +154,11 @@ const server = app.listen(PORT, () => {
     console.log('  GET  /api/auth/google - Google OAuth login');
     console.log('  GET  /api/auth/google/callback - Google OAuth callback');
     console.log('  GET  /api/auth/me - Get current user (protected)');
+    console.log('  POST /api/auth/change-password - Change password (protected)');
     console.log('  GET  /api/user/me - Get user profile (protected)');
     console.log('  PUT  /api/user/me/profile - Update profile (protected)');
+    console.log('  POST /api/user/me/avatar - Upload avatar (protected)');
+    console.log('  DELETE /api/user/me - Delete account (protected)');
     console.log('====================================');
 });
 

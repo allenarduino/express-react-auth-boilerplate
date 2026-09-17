@@ -6,5 +6,5 @@
 export * from './auth'
 
 // API client
-export { default as api, getApiErrorMessage } from './api'
+export { default as api, getApiErrorMessage, fetchUserProfile, updateUserProfile } from './api'
 export type { ApiResponse, ApiError } from './api'

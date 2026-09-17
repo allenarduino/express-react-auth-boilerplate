@@ -1,4 +1,4 @@
-# Express React Auth Boilerplate
+# Auth Starter
 
 A complete full-stack authentication application with a Node.js + TypeScript backend and React + TypeScript frontend. Features modern dashboard UI, Google OAuth, password reset, and comprehensive user management.
 
@@ -104,6 +104,7 @@ The frontend is a React + TypeScript application with modern UI components and c
 - `/signup` - User registration
 - `/forgot-password` - Password reset request
 - `/reset-password` - Password reset with token
+- `/verify-email` - Email verification from inbox link
 - `/dashboard` - Main dashboard (protected)
 - `/dashboard/profile` - User profile (protected)
 - `/dashboard/settings` - User settings (protected)
@@ -122,12 +123,15 @@ The backend is a Node.js + TypeScript API server with Express, Prisma, and compr
 - `GET /api/auth/verify` - Verify email address
 - `POST /api/auth/resend-verification` - Resend verification email
 - `GET /api/auth/me` - Get current user info
+- `POST /api/auth/change-password` - Change password (protected)
 - `GET /api/auth/google` - Google OAuth login
 - `GET /api/auth/google/callback` - Google OAuth callback
 
 #### User Management
 - `GET /api/user/me` - Get user profile
-- `PUT /api/user/me` - Update user profile
+- `PUT /api/user/me/profile` - Update user profile
+- `POST /api/user/me/avatar` - Upload profile photo
+- `DELETE /api/user/me` - Delete account
 - `GET /api/user/info` - Get user basic info
 
 ### Development
@@ -154,6 +158,7 @@ DATABASE_URL="mysql://root:password@express-react-auth-db:3306/express_react_aut
 JWT_SECRET="your-super-secret-jwt-key"
 JWT_EXPIRES_IN="7d"
 APP_URL="http://localhost:4001"
+FRONTEND_URL="http://localhost:5173"
 
 # Google OAuth (optional)
 GOOGLE_CLIENT_ID="your-google-client-id"

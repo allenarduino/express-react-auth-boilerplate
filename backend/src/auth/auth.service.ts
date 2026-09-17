@@ -20,10 +20,11 @@ export class AuthService {
      * Register a new user with email verification
      * @param email - User's email address
      * @param password - Plain text password
+     * @param name - Optional display name stored on the profile
      * @returns Promise<{ id: string; email: string }> - Basic user info
      * @throws Error if user already exists or registration fails
      */
-    async signUp(email: string, password: string): Promise<{ id: string; email: string }> {
+    async signUp(email: string, password: string, name?: string): Promise<{ id: string; email: string }> {
         // Check if user already exists
         const existingUser = await this.authRepo.findByEmail(email);
         if (existingUser) {
@@ -46,23 +47,23 @@ export class AuthService {
             verificationTokenExpires,
         });
 
-        // Create blank profile for the user
-        await this.userRepo.createProfile(user.id);
+        if (name?.trim()) {
+            await this.userRepo.createProfileWithAvatar(user.id, { name: name.trim() });
+        } else {
+            await this.userRepo.createProfile(user.id);
+        }
 
-        // Send verification email
-        const verificationLink = `${env.APP_URL}/api/auth/verify?token=${verificationToken}`;
-        const emailHtml = `
-      <h1>Welcome!</h1>
-      <p>Please verify your email address by clicking the link below:</p>
-      <a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-      <p>This link will expire in 24 hours.</p>
-      <p>If you didn't create an account, please ignore this email.</p>
-    `;
-
+        const verificationLink = `${env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
         await this.emailProvider.send(
             email,
             'Verify your email address',
-            emailHtml
+            this.buildActionEmail({
+                heading: 'Welcome!',
+                body: 'Please verify your email address by clicking the button below.',
+                actionUrl: verificationLink,
+                actionLabel: 'Verify Email',
+                footnote: 'This link will expire in 24 hours. If you didn\'t create an account, you can ignore this email.',
+            })
         );
 
         return {
@@ -181,19 +182,17 @@ export class AuthService {
         // Update user with new token
         await this.authRepo.updateVerificationToken(user.id, verificationToken, verificationTokenExpires);
 
-        // Send verification email
-        const verificationLink = `${env.APP_URL}/api/auth/verify?token=${verificationToken}`;
-        const emailHtml = `
-      <h1>Verify your email address</h1>
-      <p>Please verify your email address by clicking the link below:</p>
-      <a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-      <p>This link will expire in 24 hours.</p>
-    `;
-
+        const verificationLink = `${env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
         await this.emailProvider.send(
             email,
             'Verify your email address',
-            emailHtml
+            this.buildActionEmail({
+                heading: 'Verify your email address',
+                body: 'Please verify your email address by clicking the button below.',
+                actionUrl: verificationLink,
+                actionLabel: 'Verify Email',
+                footnote: 'This link will expire in 24 hours.',
+            })
         );
     }
 
@@ -217,20 +216,17 @@ export class AuthService {
         // Save reset token to database
         await this.authRepo.setPasswordResetToken(user.id, resetToken, resetTokenExpires);
 
-        // Send password reset email
-        const resetLink = `${env.APP_URL}/reset-password?token=${resetToken}`;
-        const emailHtml = `
-            <h1>Password Reset Request</h1>
-            <p>You requested a password reset for your account. Click the link below to reset your password:</p>
-            <a href="${resetLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
-            <p>This link will expire in 1 hour.</p>
-            <p>If you didn't request this password reset, please ignore this email.</p>
-        `;
-
+        const resetLink = `${env.FRONTEND_URL}/reset-password?token=${resetToken}`;
         await this.emailProvider.send(
             email,
             'Password Reset Request',
-            emailHtml
+            this.buildActionEmail({
+                heading: 'Password reset request',
+                body: 'You requested a password reset for your account. Click the button below to choose a new password.',
+                actionUrl: resetLink,
+                actionLabel: 'Reset Password',
+                footnote: 'This link will expire in 1 hour. If you didn\'t request this, you can ignore this email.',
+            })
         );
     }
 
@@ -258,5 +254,48 @@ export class AuthService {
             id: updatedUser.id,
             email: updatedUser.email,
         };
+    }
+
+    /**
+     * Change password for an authenticated user
+     */
+    async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+        const user = await this.authRepo.findById(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        if (!user.passwordHash) {
+            throw new Error('This account uses Google sign-in and does not have a password');
+        }
+
+        const isCurrentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isCurrentValid) {
+            throw new Error('Current password is incorrect');
+        }
+
+        const passwordHash = await bcrypt.hash(newPassword, 12);
+        await this.authRepo.updatePassword(user.id, passwordHash);
+    }
+
+    private buildActionEmail(options: {
+        heading: string;
+        body: string;
+        actionUrl: string;
+        actionLabel: string;
+        footnote: string;
+    }): string {
+        return `
+            <div style="font-family: Inter, system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111827;">
+                <h1 style="font-size: 22px; margin-bottom: 12px;">${options.heading}</h1>
+                <p style="color: #4b5563; line-height: 1.5;">${options.body}</p>
+                <p style="margin: 28px 0;">
+                    <a href="${options.actionUrl}" style="background-color: #111827; color: white; padding: 12px 20px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600;">
+                        ${options.actionLabel}
+                    </a>
+                </p>
+                <p style="color: #6b7280; font-size: 13px; line-height: 1.5;">${options.footnote}</p>
+            </div>
+        `;
     }
 }

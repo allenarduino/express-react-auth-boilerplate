@@ -21,3 +21,9 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Uploaded avatars
+backend/uploads/avatars/*.jpg
+backend/uploads/avatars/*.jpeg
+backend/uploads/avatars/*.png
+backend/uploads/avatars/*.webp

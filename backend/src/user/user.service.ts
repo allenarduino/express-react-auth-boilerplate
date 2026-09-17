@@ -203,4 +203,20 @@ export class UserService {
         // Clear profile data
         await this.userRepo.clearProfile(userId);
     }
+
+    /**
+     * Permanently delete the user account and related records.
+     */
+    async deleteAccount(userId: string): Promise<void> {
+        if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+            throw new Error('User ID is required and must be a non-empty string');
+        }
+
+        const user = await this.userRepo.findUserBasicInfo(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        await this.userRepo.deleteUser(userId);
+    }
 }

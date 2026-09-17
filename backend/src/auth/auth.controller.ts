@@ -5,7 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
 import { UserRepository } from '../user/user.repository';
 import { createEmailProvider } from '../infrastructure/email';
-import { signupSchema, loginSchema, verifyEmailSchema, resendVerificationSchema, verifyTokenSchema, passwordResetRequestSchema, passwordResetSchema } from './auth.validation';
+import { signupSchema, loginSchema, verifyEmailSchema, resendVerificationSchema, verifyTokenSchema, passwordResetRequestSchema, passwordResetSchema, changePasswordSchema } from './auth.validation';
 import { env } from '../config/env';
 
 /**
@@ -48,8 +48,8 @@ export class AuthController {
                 return;
             }
 
-            const { email, password } = validationResult.data;
-            const user = await this.authService.signUp(email, password);
+            const { email, password, name } = validationResult.data;
+            const user = await this.authService.signUp(email, password, name);
 
             res.status(201).json({
                 success: true,
@@ -241,7 +241,8 @@ export class AuthController {
                     name: fullUser.googleName,
                     googlePicture: fullUser.googlePicture,
                     isEmailVerified: fullUser.isEmailVerified,
-                    authProvider: fullUser.authProvider
+                    authProvider: fullUser.authProvider,
+                    hasPassword: Boolean(fullUser.passwordHash),
                 },
             });
         } catch (error) {
@@ -295,7 +296,7 @@ export class AuthController {
                 } as jwt.SignOptions);
 
                 // Redirect to frontend with token
-                const frontendUrl = `${env.APP_URL.replace('4001', '5173')}/auth/callback?token=${token}`;
+                const frontendUrl = `${env.FRONTEND_URL}/auth/callback?token=${token}`;
                 return res.redirect(frontendUrl);
             } catch (error) {
                 return res.status(500).json({
@@ -373,6 +374,49 @@ export class AuthController {
                     id: user.id,
                     email: user.email,
                 },
+            });
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                message: (error as Error).message,
+            });
+        }
+    }
+
+    /**
+     * POST /api/auth/change-password
+     * Change password for the authenticated user
+     */
+    async changePassword(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = (req as any).user?.id;
+            if (!userId) {
+                res.status(401).json({
+                    success: false,
+                    message: 'User not authenticated',
+                });
+                return;
+            }
+
+            const validationResult = changePasswordSchema.safeParse(req.body);
+            if (!validationResult.success) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Validation failed',
+                    errors: validationResult.error.issues.map((err: any) => ({
+                        field: err.path.join('.'),
+                        message: err.message,
+                    })),
+                });
+                return;
+            }
+
+            const { currentPassword, newPassword } = validationResult.data;
+            await this.authService.changePassword(userId, currentPassword, newPassword);
+
+            res.status(200).json({
+                success: true,
+                message: 'Password updated successfully',
             });
         } catch (error) {
             res.status(400).json({

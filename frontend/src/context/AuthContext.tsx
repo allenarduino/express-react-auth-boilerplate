@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import api, { getApiErrorMessage } from '../lib/api'
 import { getToken, setToken, clearToken } from '../lib/auth'
 
-// Types
 export interface User {
     id: string
     email: string
     name?: string
     googlePicture?: string
+    isEmailVerified?: boolean
+    authProvider?: string
+    hasPassword?: boolean
     profile?: {
         name?: string
         bio?: string
@@ -25,6 +27,7 @@ export interface LoginCredentials {
 export interface SignupCredentials {
     email: string
     password: string
+    name?: string
 }
 
 export interface AuthContextType {
@@ -34,36 +37,31 @@ export interface AuthContextType {
     isAuthenticated: boolean
     login: (credentials: LoginCredentials) => Promise<void>
     signup: (credentials: SignupCredentials) => Promise<{ message: string }>
-    logout: () => void
+    logout: (options?: { to?: string; state?: unknown }) => void
     setTokenFromCallback: (token: string) => Promise<void>
+    refreshUser: () => Promise<void>
 }
 
-// Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Auth provider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null)
     const [token, setTokenState] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const navigate = useNavigate()
 
-    // Check if user is authenticated
     const isAuthenticated = !!user && !!token
 
-    // Initialize auth state from localStorage
     useEffect(() => {
         const initializeAuth = async () => {
             try {
                 const storedToken = getToken()
                 if (storedToken) {
                     setTokenState(storedToken)
-                    // Fetch user profile to verify token and get user info
                     await fetchUserProfile(storedToken)
                 }
             } catch (error) {
                 console.error('Failed to initialize auth:', error)
-                // Clear invalid token
                 clearToken()
                 setTokenState(null)
                 setUser(null)
@@ -75,78 +73,64 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         initializeAuth()
     }, [])
 
-    // Fetch user profile from /me endpoint
     const fetchUserProfile = async (authToken: string) => {
-        try {
-            // Fetch basic user info
-            const userResponse = await api.get('/api/auth/me', {
-                headers: {
-                    Authorization: `Bearer ${authToken}`
-                }
-            })
+        const userResponse = await api.get('/api/auth/me', {
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+            },
+        })
 
-            // Fetch profile data
-            const profileResponse = await api.get('/api/user/me', {
-                headers: {
-                    Authorization: `Bearer ${authToken}`
-                }
-            })
+        const profileResponse = await api.get('/api/user/me', {
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+            },
+        })
 
-            // Combine user and profile data
-            const userData = {
-                ...userResponse.data.data,
-                profile: profileResponse.data.data
-            }
-
-            setUser(userData)
-        } catch (error) {
-            throw new Error('Failed to fetch user profile')
+        const profileData = profileResponse.data.data
+        const userData = {
+            ...userResponse.data.data,
+            profile: profileData.profile,
         }
+
+        setUser(userData)
     }
 
-    // Login function
     const login = async (credentials: LoginCredentials) => {
         try {
             setIsLoading(true)
             const response = await api.post('/api/auth/login', credentials)
+            const authToken = response.data?.data?.token || response.data?.token
 
-            const { token: authToken, user: userData } = response.data
+            if (!authToken) {
+                throw new Error('No token received from server')
+            }
 
-            // Store token in localStorage
             setToken(authToken)
             setTokenState(authToken)
-            setUser(userData)
-
-            // Redirect to dashboard
-            navigate('/dashboard')
+            await fetchUserProfile(authToken)
         } catch (error) {
-            const errorMessage = getApiErrorMessage(error)
-            throw new Error(errorMessage)
+            throw new Error(getApiErrorMessage(error))
         } finally {
             setIsLoading(false)
         }
     }
 
-    // Signup function
     const signup = async (credentials: SignupCredentials) => {
         try {
             const response = await api.post('/api/auth/signup', credentials)
             return response.data
         } catch (error) {
-            const errorMessage = getApiErrorMessage(error)
-            throw new Error(errorMessage)
+            throw new Error(getApiErrorMessage(error))
         }
     }
 
-    // Logout function
-    const logout = () => {
+    const logout = (options?: { to?: string; state?: unknown }) => {
         clearToken()
         setTokenState(null)
         setUser(null)
-        navigate('/login')
+        navigate(options?.to ?? '/login', { replace: true, state: options?.state })
     }
 
-    // Set token from OAuth callback
     const setTokenFromCallback = async (authToken: string) => {
         try {
             setIsLoading(true)
@@ -164,6 +148,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }
 
+    const refreshUser = async () => {
+        if (!token) return
+        await fetchUserProfile(token)
+    }
+
     const value: AuthContextType = {
         user,
         token,
@@ -172,17 +161,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         signup,
         logout,
-        setTokenFromCallback
+        setTokenFromCallback,
+        refreshUser,
     }
 
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
-    )
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-// Custom hook to use auth context
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext)
     if (context === undefined) {

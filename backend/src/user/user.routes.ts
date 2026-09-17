@@ -15,10 +15,14 @@ export function createUserRoutes(userController?: UserController): Router {
     const getUserInfo = controller.getUserInfo.bind(controller);
     const deleteProfile = controller.deleteProfile.bind(controller);
     const getPublicProfile = controller.getPublicProfile.bind(controller);
+    const deleteAccount = controller.deleteAccount.bind(controller);
+    const uploadAvatar = controller.uploadAvatar.bind(controller);
 
     // Protected routes (require authentication)
     router.get('/me', authMiddleware, getProfile);
     router.put('/me/profile', authMiddleware, updateProfile);
+    router.post('/me/avatar', authMiddleware, uploadAvatar);
+    router.delete('/me', authMiddleware, deleteAccount);
     router.get('/info', authMiddleware, getUserInfo);
     router.delete('/profile', authMiddleware, deleteProfile);
 
