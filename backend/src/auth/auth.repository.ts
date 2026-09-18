@@ -1,5 +1,6 @@
 import { PrismaClient, User } from '@prisma/client';
 import { prisma } from '../config/prisma';
+import { hashToken } from './tokens';
 
 /**
  * Authentication repository for user authentication operations
@@ -64,7 +65,7 @@ export class AuthRepository {
      */
     async findByVerificationToken(token: string): Promise<User | null> {
         return this.prisma.user.findFirst({
-            where: { verificationToken: token },
+            where: { verificationToken: hashToken(token) },
         });
     }
 
@@ -228,22 +229,6 @@ export class AuthRepository {
             data: {
                 passwordResetToken: resetToken,
                 passwordResetExpires: resetExpires,
-            },
-        });
-    }
-
-    /**
-     * Find user by password reset token
-     * @param resetToken - The password reset token to search for
-     * @returns Promise<User | null> - The user if found and token is valid, null otherwise
-     */
-    async findByPasswordResetToken(resetToken: string): Promise<User | null> {
-        return this.prisma.user.findFirst({
-            where: {
-                passwordResetToken: resetToken,
-                passwordResetExpires: {
-                    gt: new Date(), // Token must not be expired
-                },
             },
         });
     }

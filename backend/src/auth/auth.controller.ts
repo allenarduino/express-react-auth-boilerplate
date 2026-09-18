@@ -6,8 +6,16 @@ import { UserRepository } from '../user/user.repository';
 import { createEmailProvider } from '../infrastructure/email';
 import { signupSchema, loginSchema, verifyEmailSchema, resendVerificationSchema, verifyTokenSchema, passwordResetRequestSchema, passwordResetSchema, changePasswordSchema } from './auth.validation';
 import { env, isGoogleAuthConfigured } from '../config/env';
-import { clearAuthCookie, setAuthCookie } from './auth.cookies';
+import {
+    AUTH_SESSION_COOKIE,
+    clearSessionCookies,
+    getCookieValue,
+    REMEMBER_COOKIE,
+    setSessionCookies,
+} from './auth.cookies';
 import { AuthRequest } from '../presentation/middleware/auth';
+import { SessionRepository } from './session.repository';
+import { consumeOAuthState, startOAuthState } from './oauth-state';
 
 /**
  * Authentication controller for handling HTTP requests
@@ -25,7 +33,8 @@ export class AuthController {
             this.authRepo = new AuthRepository();
             const userRepo = new UserRepository();
             const emailProvider = createEmailProvider();
-            this.authService = new AuthService(this.authRepo, userRepo, emailProvider);
+            const sessionRepo = new SessionRepository();
+            this.authService = new AuthService(this.authRepo, userRepo, emailProvider, sessionRepo);
         }
     }
 
@@ -124,7 +133,7 @@ export class AuthController {
 
             const { email, password, rememberMe } = validationResult.data;
             const result = await this.authService.login(email, password, rememberMe);
-            setAuthCookie(res, result.token, result.rememberMe);
+            setSessionCookies(res, result.sessionToken, result.rememberToken);
 
             res.status(200).json({
                 success: true,
@@ -140,10 +149,17 @@ export class AuthController {
 
     /**
      * POST /api/auth/logout
-     * Clear the httpOnly session cookie.
+     * Revoke the current session and remember-me token, then clear cookies.
      */
-    async logout(_req: Request, res: Response): Promise<void> {
-        clearAuthCookie(res);
+    async logout(req: Request, res: Response): Promise<void> {
+        try {
+            await this.authService.revokeBrowserTokens(
+                getCookieValue(req, AUTH_SESSION_COOKIE),
+                getCookieValue(req, REMEMBER_COOKIE)
+            );
+        } finally {
+            clearSessionCookies(res);
+        }
         res.status(200).json({
             success: true,
             message: 'Logged out',
@@ -213,7 +229,7 @@ export class AuthController {
 
     /**
      * GET /api/auth/me
-     * Get current user info from JWT token
+     * Get current user info from the session or Bearer JWT
      */
     async getMe(req: Request, res: Response): Promise<void> {
         try {
@@ -264,7 +280,7 @@ export class AuthController {
      * GET /api/auth/google
      * Initiate Google OAuth login
      */
-    async googleLogin(req: Request, res: Response): Promise<void> {
+    async googleLogin(_req: Request, res: Response): Promise<void> {
         if (!isGoogleAuthConfigured()) {
             res.status(503).json({
                 success: false,
@@ -273,9 +289,15 @@ export class AuthController {
             return;
         }
 
-        passport.authenticate('google', {
-            scope: ['profile', 'email']
-        })(req, res);
+        const state = startOAuthState(res);
+        const callbackURL = `${env.APP_URL}/api/auth/google/callback`;
+        const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        url.searchParams.set('client_id', env.GOOGLE_CLIENT_ID);
+        url.searchParams.set('redirect_uri', callbackURL);
+        url.searchParams.set('response_type', 'code');
+        url.searchParams.set('scope', 'profile email');
+        url.searchParams.set('state', state);
+        res.redirect(url.toString());
     }
 
     /**
@@ -283,7 +305,12 @@ export class AuthController {
      * Handle Google OAuth callback
      */
     googleCallback(req: Request, res: Response): void {
-        passport.authenticate('google', { session: false }, (err: any, user: any) => {
+        if (!consumeOAuthState(req, res)) {
+            res.redirect(`${env.FRONTEND_URL}/login?error=oauth_state`);
+            return;
+        }
+
+        passport.authenticate('google', { session: false }, async (err: any, user: any) => {
             if (err) {
                 return res.status(400).json({
                     success: false,
@@ -300,8 +327,8 @@ export class AuthController {
             }
 
             try {
-                const token = this.authService.issueAccessToken(user.id, user.email, true);
-                setAuthCookie(res, token, true);
+                const tokens = await this.authService.createBrowserSession(user.id, true);
+                setSessionCookies(res, tokens.sessionToken, tokens.rememberToken);
                 return res.redirect(`${env.FRONTEND_URL}/auth/callback`);
             } catch (error) {
                 return res.status(500).json({
@@ -369,8 +396,8 @@ export class AuthController {
                 return;
             }
 
-            const { token, password } = validationResult.data;
-            const user = await this.authService.resetPassword(token, password);
+            const { token, password, email } = validationResult.data;
+            const user = await this.authService.resetPassword(email, token, password);
 
             res.status(200).json({
                 success: true,
@@ -417,7 +444,12 @@ export class AuthController {
             }
 
             const { currentPassword, newPassword } = validationResult.data;
-            await this.authService.changePassword(userId, currentPassword, newPassword);
+            await this.authService.changePassword(
+                userId,
+                currentPassword,
+                newPassword,
+                (req as AuthRequest).sessionId
+            );
 
             res.status(200).json({
                 success: true,

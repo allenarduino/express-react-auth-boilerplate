@@ -1,7 +1,12 @@
 import request, { Response } from 'supertest';
+import jwt from 'jsonwebtoken';
 import { app } from '../src/server';
 import { getTestPrisma, resetDatabase } from './database';
 import { testUtils } from './setup';
+import {
+    extractTokenFromLatestEmail,
+    resetCapturedEmails,
+} from '../src/infrastructure/email/ConsoleEmailProvider';
 
 function cookieList(response: Response): string[] {
     const header = response.headers['set-cookie'];
@@ -9,14 +14,14 @@ function cookieList(response: Response): string[] {
     return Array.isArray(header) ? header : [header];
 }
 
-function authCookieHeader(response: Response): string | undefined {
-    return cookieList(response).find((cookie) => cookie.startsWith('auth_token='));
+function cookieHeader(response: Response, name: string): string | undefined {
+    return cookieList(response).find((cookie) => cookie.startsWith(`${name}=`));
 }
 
-function authCookieValue(response: Response): string | undefined {
-    const header = authCookieHeader(response);
+function cookieValue(response: Response, name: string): string | undefined {
+    const header = cookieHeader(response, name);
     if (!header) return undefined;
-    return header.split(';')[0]?.slice('auth_token='.length);
+    return header.split(';')[0]?.slice(`${name}=`.length);
 }
 
 describe('Authentication Integration Tests', () => {
@@ -32,8 +37,7 @@ describe('Authentication Integration Tests', () => {
             .expect(201);
 
         const id = signupResponse.body.data.id as string;
-        const userInDb = await prisma.user.findUnique({ where: { id } });
-        const token = userInDb?.verificationToken || '';
+        const token = extractTokenFromLatestEmail() || '';
 
         await request(app).get(`/api/auth/verify?token=${token}`).expect(200);
 
@@ -46,6 +50,7 @@ describe('Authentication Integration Tests', () => {
 
     beforeEach(() => {
         testUser = testUtils.generateTestUser();
+        resetCapturedEmails();
     });
 
     afterAll(async () => {
@@ -81,7 +86,9 @@ describe('Authentication Integration Tests', () => {
             expect(userInDb?.verificationToken).toBeTruthy();
             expect(userInDb?.profile).toBeTruthy();
 
-            verificationToken = userInDb?.verificationToken || '';
+            verificationToken = extractTokenFromLatestEmail() || '';
+            expect(verificationToken).toBeTruthy();
+            expect(userInDb?.verificationToken).not.toBe(verificationToken);
         });
 
         it('should return 400 for invalid email format', async () => {
@@ -142,11 +149,7 @@ describe('Authentication Integration Tests', () => {
                 });
 
             createdUserId = signupResponse.body.data.id;
-
-            const userInDb = await prisma.user.findUnique({
-                where: { id: createdUserId },
-            });
-            verificationToken = userInDb?.verificationToken || '';
+            verificationToken = extractTokenFromLatestEmail() || '';
         });
 
         it('should verify email successfully with valid token', async () => {
@@ -208,10 +211,12 @@ describe('Authentication Integration Tests', () => {
             expect(response.body).toHaveProperty('message');
             expect(response.body.data?.token).toBeUndefined();
 
-            const cookie = authCookieHeader(response);
+            const cookie = cookieHeader(response, 'auth_session');
             expect(cookie).toBeTruthy();
             expect(cookie).toMatch(/HttpOnly/i);
             expect(cookie).not.toMatch(/Max-Age=/i);
+            const rememberCookie = cookieHeader(response, 'remember_me');
+            expect(rememberCookie || '').not.toMatch(/Max-Age=2592000/i);
         });
 
         it('should set a persistent cookie when rememberMe is true', async () => {
@@ -224,10 +229,14 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
-            const cookie = authCookieHeader(response);
-            expect(cookie).toBeTruthy();
-            expect(cookie).toMatch(/HttpOnly/i);
-            expect(cookie).toMatch(/Max-Age=2592000/i);
+            const sessionCookie = cookieHeader(response, 'auth_session');
+            const rememberCookie = cookieHeader(response, 'remember_me');
+            expect(sessionCookie).toBeTruthy();
+            expect(sessionCookie).toMatch(/HttpOnly/i);
+            expect(sessionCookie).not.toMatch(/Max-Age=/i);
+            expect(rememberCookie).toBeTruthy();
+            expect(rememberCookie).toMatch(/HttpOnly/i);
+            expect(rememberCookie).toMatch(/Max-Age=2592000/i);
         });
 
         it('should return 401 for unverified email', async () => {
@@ -286,7 +295,7 @@ describe('Authentication Integration Tests', () => {
             createdUserId = created.id;
 
             agent = request.agent(app);
-            const loginResponse = await agent
+            await agent
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
@@ -294,7 +303,11 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
-            bearerToken = authCookieValue(loginResponse) || '';
+            bearerToken = jwt.sign(
+                { sub: createdUserId, email: testUser.email },
+                process.env.JWT_SECRET || 'test-jwt-secret-key-for-testing-only',
+                { expiresIn: '15m' }
+            );
         });
 
         it('should return user profile using the session cookie', async () => {
@@ -347,11 +360,11 @@ describe('Authentication Integration Tests', () => {
     });
 
     describe('POST /api/auth/logout', () => {
-        it('should clear the session cookie', async () => {
+        it('should revoke the session so the old cookie no longer works', async () => {
             await signupAndVerify(testUser.email, testUser.password);
             const agent = request.agent(app);
 
-            await agent
+            const loginResponse = await agent
                 .post('/api/auth/login')
                 .send({
                     email: testUser.email,
@@ -359,9 +372,17 @@ describe('Authentication Integration Tests', () => {
                 })
                 .expect(200);
 
+            const sessionToken = cookieValue(loginResponse, 'auth_session');
+            expect(sessionToken).toBeTruthy();
+
             await agent.get('/api/auth/me').expect(200);
             await agent.post('/api/auth/logout').expect(200);
             await agent.get('/api/auth/me').expect(401);
+
+            await request(app)
+                .get('/api/auth/me')
+                .set('Cookie', `auth_session=${sessionToken}`)
+                .expect(401);
         });
     });
 
@@ -416,14 +437,17 @@ describe('Authentication Integration Tests', () => {
             const userAfterForgot = await prisma.user.findUnique({
                 where: { email: testUser.email },
             });
-            const resetToken = userAfterForgot?.passwordResetToken;
-            expect(resetToken).toBeTruthy();
+            const emailedToken = extractTokenFromLatestEmail();
+            expect(emailedToken).toBeTruthy();
+            expect(userAfterForgot?.passwordResetToken).toBeTruthy();
+            expect(userAfterForgot?.passwordResetToken).not.toBe(emailedToken);
 
             const newPassword = 'newpassword123';
             await request(app)
                 .post('/api/auth/reset-password')
                 .send({
-                    token: resetToken,
+                    email: testUser.email,
+                    token: emailedToken,
                     password: newPassword,
                 })
                 .expect(200);
@@ -452,6 +476,7 @@ describe('Authentication Integration Tests', () => {
             const response = await request(app)
                 .post('/api/auth/reset-password')
                 .send({
+                    email: testUser.email,
                     token: 'not-a-real-reset-token',
                     password: 'newpassword123',
                 })

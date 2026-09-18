@@ -8,6 +8,7 @@ import { AuthError, AuthLayout, AuthSubmitButton, authInputClassName } from '../
 
 const resetPasswordSchema = z
     .object({
+        email: z.string().email('Enter the email for this account'),
         password: z.string().min(6, 'Password must be at least 6 characters long'),
         confirmPassword: z.string().min(6, 'Please confirm your password'),
     })
@@ -49,6 +50,7 @@ export const ResetPasswordPage: React.FC = () => {
 
         try {
             await api.post('/api/auth/reset-password', {
+                email: data.email.trim().toLowerCase(),
                 token,
                 password: data.password,
             })
@@ -87,9 +89,23 @@ export const ResetPasswordPage: React.FC = () => {
     }
 
     return (
-        <AuthLayout title="Reset your password" subtitle="Enter a new password below.">
+        <AuthLayout title="Reset your password" subtitle="Confirm your email and choose a new password.">
             <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
                 {submitError && <AuthError message={submitError} />}
+                <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        Email address
+                    </label>
+                    <input
+                        {...register('email')}
+                        type="email"
+                        id="email"
+                        autoComplete="email"
+                        className={authInputClassName}
+                        placeholder="Enter your email"
+                    />
+                    {errors.email && <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>}
+                </div>
                 <div>
                     <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                         New password

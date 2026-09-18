@@ -27,8 +27,9 @@ A complete full-stack authentication application with a Node.js + TypeScript bac
 ## Features
 
 ### Authentication & Security
-- **httpOnly cookie sessions** - JWT is set as an `auth_token` cookie. It is not stored in `localStorage`.
-- **Remember me** - Unchecked: session cookie. Checked: 30-day cookie and JWT.
+- **httpOnly cookie sessions** - Browser login sets an opaque `auth_session` cookie. It is not a JWT and it is not stored in `localStorage`.
+- **Remember me** - Unchecked: session cookie only. Checked: a separate 30-day `remember_me` cookie. Neither is a long-lived JWT.
+- **Revocable logout** - Logout deletes the session (and remember token) in the database, then clears cookies. The old cookie cannot be reused.
 - **Rate limiting** - Login, signup, forgot-password, and resend-verification are limited to 10 requests per 15 minutes per IP
 - **Google OAuth** - Social login with Google (cookie is set on callback; the token is not put in the URL)
 - **Password Reset** - Secure email-based password reset flow
@@ -141,10 +142,10 @@ The backend is a Node.js + TypeScript API server with Express, Prisma, and compr
 
 #### Authentication
 - `POST /api/auth/signup` - User registration
-- `POST /api/auth/login` - User login (sets httpOnly cookie; body may include `rememberMe`)
-- `POST /api/auth/logout` - Clear session cookie
+- `POST /api/auth/login` - User login (sets `auth_session` cookie; body may include `rememberMe`)
+- `POST /api/auth/logout` - Revoke the current session and clear cookies
 - `POST /api/auth/forgot-password` - Request password reset
-- `POST /api/auth/reset-password` - Reset password with token
+- `POST /api/auth/reset-password` - Reset password with email, token, and new password
 - `GET /api/auth/verify` - Verify email address
 - `POST /api/auth/resend-verification` - Resend verification email
 - `GET /api/auth/me` - Get current user info (cookie or Bearer)
@@ -181,7 +182,7 @@ NODE_ENV=development
 PORT=4001
 DATABASE_URL="postgresql://app_user:app_password@localhost:5433/express_react_auth"
 JWT_SECRET="your-super-secret-jwt-key"
-JWT_EXPIRES_IN="7d"
+JWT_EXPIRES_IN="15m"
 APP_URL="http://localhost:4001"
 FRONTEND_URL="http://localhost:5173"
 
@@ -253,9 +254,19 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## Session model
 
-The browser session is an httpOnly cookie named `auth_token`. Axios sends it with `withCredentials: true`. JWT-in-localStorage is a known shortcut this starter does not use.
+Browser sessions are **not JWTs**. Login writes a random token to an httpOnly `auth_session` cookie and stores only a SHA-256 hash of that token in the `Session` table. Axios sends it with `withCredentials: true`. JWT-in-localStorage is a known shortcut this starter does not use.
 
-Remember me controls cookie lifetime: session cookie when unchecked, 30 days when checked. Google OAuth always uses the 30-day cookie.
+**Remember me** is a separate httpOnly `remember_me` cookie, also stored hashed, with a 30-day lifetime. The session cookie itself stays a session cookie. If the session cookie is missing but the remember cookie is valid, the server mints a new session. Google OAuth always sets the remember cookie.
+
+**Logout** deletes those database rows, then clears the cookies. Clearing the cookie alone is not enough; a stolen cookie must fail after logout.
+
+**Bearer JWTs** are a different strategy for API clients. They are short-lived (`JWT_EXPIRES_IN`, default 15 minutes), are not used for Remember me, and are not written to cookies. They cannot be revoked until they expire, which is the usual JWT tradeoff.
+
+**CSRF.** This app is a JSON API with CORS limited to the frontend origin and cookies set `SameSite=Lax`. Cross-site form posts do not send those cookies. If you later set `SameSite=None` (for example a frontend on another site), you need a CSRF token. Traditional HTML form posts to these endpoints are not the intended use.
+
+**OAuth.** Google login sends a `state` value in an httpOnly cookie and rejects the callback if it does not match.
+
+**Email tokens.** Verification and password-reset tokens are emailed in plaintext and stored hashed. Password reset also requires the account email, so a leaked token is not enough by itself.
 
 ## Testing
 

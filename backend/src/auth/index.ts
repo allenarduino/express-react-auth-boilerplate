@@ -21,5 +21,5 @@ app.use('/api/auth', createAuthRoutes());
 // POST /api/auth/verify-token - Verify JWT token
 // POST /api/auth/resend-verification - Resend verification email
 // GET  /api/auth/me - Get current user (cookie or Bearer)
-// POST /api/auth/logout - Clear session cookie
+// POST /api/auth/logout - Revoke session and clear cookies
 */

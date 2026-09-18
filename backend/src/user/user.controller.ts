@@ -4,7 +4,7 @@ import { UserRepository } from './user.repository';
 import { deleteAccountSchema, updateProfileSchema, uploadAvatarSchema } from './user.validation';
 import { saveAvatarFromDataUrl } from './avatar';
 import { env } from '../config/env';
-import { clearAuthCookie } from '../auth/auth.cookies';
+import { clearSessionCookies } from '../auth/auth.cookies';
 
 /**
  * User controller for handling profile-related HTTP requests
@@ -224,7 +224,7 @@ export class UserController {
             }
 
             await this.userService.deleteAccount(userId);
-            clearAuthCookie(res);
+            clearSessionCookies(res);
 
             res.status(200).json({
                 success: true,

@@ -37,7 +37,7 @@ services:
       - PORT=4000
       - DATABASE_URL=postgresql://app_user:app_password@db:5432/express_react_auth
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=7d
+      - JWT_EXPIRES_IN=15m
       - EMAIL_PROVIDER=resend
       - RESEND_API_KEY=${RESEND_API_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}

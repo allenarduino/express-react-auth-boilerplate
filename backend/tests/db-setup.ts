@@ -40,6 +40,7 @@ export const cleanupTestDatabase = async (): Promise<void> => {
             },
         });
 
+        await prisma.session.deleteMany();
         await prisma.profile.deleteMany();
         await prisma.user.deleteMany();
         await prisma.$disconnect();

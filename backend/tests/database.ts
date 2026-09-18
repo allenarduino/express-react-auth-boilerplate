@@ -19,6 +19,7 @@ export const resetDatabase = async (): Promise<void> => {
     const testPrisma = getTestPrisma();
 
     // Delete in correct order due to foreign key constraints
+    await testPrisma.session.deleteMany();
     await testPrisma.profile.deleteMany();
     await testPrisma.user.deleteMany();
 };

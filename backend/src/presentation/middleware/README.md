@@ -4,7 +4,7 @@ This directory contains JWT authentication middleware for protecting routes.
 
 ## Files
 
-- `auth.ts` - Cookie or Bearer JWT authentication middleware
+- `auth.ts` - Cookie session or Bearer JWT authentication middleware
 - `rateLimit.ts` - Rate limiter for login, signup, and password-reset writes
 - `index.ts` - Exports all middleware functions
 
@@ -46,7 +46,7 @@ router.get('/optional', optionalAuthMiddleware, (req: AuthRequest, res) => {
 ## Middleware Behavior
 
 ### authMiddleware
-- **Required**: `auth_token` httpOnly cookie, or `Authorization: Bearer <token>`
+- **Required**: `auth_session` httpOnly cookie (optional `remember_me`), or `Authorization: Bearer <jwt>`
 - **Success**: Attaches `req.user = { id, email }` and calls `next()`
 - **Failure**: Returns 401 JSON error and stops request processing
 

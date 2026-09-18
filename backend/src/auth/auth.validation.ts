@@ -40,6 +40,7 @@ export const passwordResetRequestSchema = z.object({
 
 // Password reset validation
 export const passwordResetSchema = z.object({
+    email: z.string().email('Invalid email format'),
     token: z.string().min(1, 'Reset token is required'),
     password: z.string().min(6, 'Password must be at least 6 characters long'),
 });

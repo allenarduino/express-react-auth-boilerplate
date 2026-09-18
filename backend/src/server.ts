@@ -16,6 +16,7 @@ import { UserRepository } from './user/user.repository';
 import { AuthController } from './auth/auth.controller';
 import { UserController } from './user/user.controller';
 import { configureGoogleStrategy } from './auth/google.strategy';
+import { SessionRepository } from './auth/session.repository';
 
 // Load environment variables
 config();
@@ -51,7 +52,7 @@ const userRepository = new UserRepository(prisma);
 const emailProvider = createEmailProvider();
 
 // Initialize services with dependencies
-const authService = new AuthService(authRepository, userRepository, emailProvider);
+const authService = new AuthService(authRepository, userRepository, emailProvider, new SessionRepository(prisma));
 const userService = new UserService(userRepository);
 
 // Initialize controllers with services
@@ -159,7 +160,7 @@ if (env.NODE_ENV !== 'test') {
         console.log('  POST /api/auth/signup - Register user');
         console.log('  GET  /api/auth/verify?token=xxx - Verify email');
         console.log('  POST /api/auth/login - Login user');
-        console.log('  POST /api/auth/logout - Clear session cookie');
+        console.log('  POST /api/auth/logout - Revoke session and clear cookies');
         console.log('  GET  /api/auth/google - Google OAuth login');
         console.log('  GET  /api/auth/google/callback - Google OAuth callback');
         console.log('  GET  /api/auth/me - Get current user (protected)');

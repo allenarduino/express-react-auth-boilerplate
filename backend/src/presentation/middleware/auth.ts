@@ -1,31 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
-import { getTokenFromRequest } from '../../auth/auth.cookies';
+import {
+    AUTH_SESSION_COOKIE,
+    getBearerToken,
+    getCookieValue,
+    REMEMBER_COOKIE,
+    setSessionCookies,
+} from '../../auth/auth.cookies';
+import {
+    REMEMBER_KIND,
+    SESSION_KIND,
+    SESSION_TTL_MS,
+    SessionRepository,
+} from '../../auth/session.repository';
 
-/**
- * Extended Request interface with user authentication data
- */
 export interface AuthRequest extends Request {
     user: {
         id: string;
         email: string;
     };
+    sessionId?: string;
 }
 
-function attachUserFromToken(req: Request, token: string): boolean {
-    const payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+const sessionRepo = new SessionRepository();
 
-    if (!payload.sub || !payload.email) {
-        return false;
-    }
-
+function attachUser(req: Request, user: { id: string; email: string }, sessionId?: string): void {
     (req as AuthRequest).user = {
-        id: payload.sub,
-        email: payload.email,
+        id: user.id,
+        email: user.email,
     };
-
-    return true;
+    if (sessionId) {
+        (req as AuthRequest).sessionId = sessionId;
+    }
 }
 
 function sendAuthError(res: Response, error: string): void {
@@ -35,27 +42,68 @@ function sendAuthError(res: Response, error: string): void {
     });
 }
 
+async function authenticateSessionCookie(req: Request, res: Response): Promise<boolean> {
+    const sessionToken = getCookieValue(req, AUTH_SESSION_COOKIE);
+    if (sessionToken) {
+        const session = await sessionRepo.findValid(sessionToken, SESSION_KIND);
+        if (session) {
+            attachUser(req, session.user, session.id);
+            return true;
+        }
+    }
+
+    const rememberToken = getCookieValue(req, REMEMBER_COOKIE);
+    if (!rememberToken) {
+        return false;
+    }
+
+    const remember = await sessionRepo.findValid(rememberToken, REMEMBER_KIND);
+    if (!remember) {
+        return false;
+    }
+
+    const nextSession = await sessionRepo.create(remember.userId, SESSION_KIND, SESSION_TTL_MS);
+    setSessionCookies(res, nextSession.rawToken, rememberToken);
+    attachUser(req, remember.user, nextSession.id);
+    return true;
+}
+
+function authenticateBearer(req: Request, token: string): boolean {
+    const payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+    if (!payload.sub || !payload.email) {
+        return false;
+    }
+    attachUser(req, { id: payload.sub, email: payload.email as string });
+    return true;
+}
+
 /**
- * JWT authentication middleware.
- *
- * Accepts an httpOnly `auth_token` cookie (browser sessions) or an
- * `Authorization: Bearer <token>` header (API clients and tests).
+ * Cookie sessions and Bearer JWTs are separate strategies.
+ * Browser requests use `auth_session` / `remember_me` cookies.
+ * API clients use `Authorization: Bearer`.
  */
-export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+export const authMiddleware = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
     try {
-        const token = getTokenFromRequest(req);
-
-        if (!token) {
-            sendAuthError(res, 'Authentication required');
+        if (await authenticateSessionCookie(req, res)) {
+            next();
             return;
         }
 
-        if (!attachUserFromToken(req, token)) {
-            sendAuthError(res, 'Invalid token payload');
+        const bearerToken = getBearerToken(req);
+        if (bearerToken) {
+            if (!authenticateBearer(req, bearerToken)) {
+                sendAuthError(res, 'Invalid token payload');
+                return;
+            }
+            next();
             return;
         }
 
-        next();
+        sendAuthError(res, 'Authentication required');
     } catch (error) {
         if (error instanceof jwt.TokenExpiredError) {
             sendAuthError(res, 'Token has expired');
@@ -76,19 +124,21 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
     }
 };
 
-/**
- * Optional middleware for routes that can work with or without authentication.
- */
-export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+export const optionalAuthMiddleware = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
     try {
-        const token = getTokenFromRequest(req);
-
-        if (!token) {
+        if (await authenticateSessionCookie(req, res)) {
             next();
             return;
         }
 
-        attachUserFromToken(req, token);
+        const bearerToken = getBearerToken(req);
+        if (bearerToken) {
+            authenticateBearer(req, bearerToken);
+        }
         next();
     } catch {
         next();
